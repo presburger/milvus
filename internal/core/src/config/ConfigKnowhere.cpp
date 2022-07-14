@@ -78,4 +78,14 @@ KnowhereSetIndexSliceSize(const int64_t size) {
     knowhere::KnowhereConfig::SetIndexFileSliceSize(size);
 }
 
+void
+KnowhereInitGPUResource(const std::vector<int64_t>& gpu_ids) {
+    knowhere::KnowhereConfig::InitGPUResource(gpu_ids);
+}
+
+void
+KnowhereFreeGPUResource() {
+    knowhere::KnowhereConfig::FreeGPUResource();
+}
+
 }  // namespace milvus::config

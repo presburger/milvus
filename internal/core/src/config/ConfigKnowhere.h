@@ -16,7 +16,7 @@
 
 #pragma once
 #include <string>
-
+#include <vector>
 namespace milvus::config {
 
 void
@@ -27,5 +27,11 @@ KnowhereSetSimdType(const char*);
 
 void
 KnowhereSetIndexSliceSize(const int64_t size);
+
+void
+KnowhereInitGPUResource(const std::vector<int64_t>& gpu_ids);
+
+void
+KnowhereFreeGPUResource();
 
 }  // namespace milvus::config

@@ -12,7 +12,8 @@
 #include <string.h>
 #include "config/ConfigKnowhere.h"
 #include "indexbuilder/init_c.h"
-
+#include <stdarg.h>
+#include <vector>
 void
 IndexBuilderInit(const char* conf_file) {
     milvus::config::KnowhereInitImpl(conf_file);
@@ -31,4 +32,21 @@ IndexBuilderSetSimdType(const char* value) {
 void
 IndexBuilderSetIndexSliceSize(const int64_t value) {
     milvus::config::KnowhereSetIndexSliceSize(value);
+}
+
+void
+IndexBuilderInitGPUResource(int cnt, ...) {
+    std::vector<int64_t> gpu_ids;
+    va_list p_args;
+    va_start(p_args, cnt);
+    for (idx = 0; idx < cnt; ++idx) {
+        gpu_ids.push_back(va_arg(p_args, int64_t));
+    }
+    va_end(p_args);
+    milvus::config::KnowhereInitGPUResource(gpu_ids);
+}
+
+void
+IndexBuilderFreeGPUResource() {
+    milvus::config::KnowhereFreeGPUResource();
 }

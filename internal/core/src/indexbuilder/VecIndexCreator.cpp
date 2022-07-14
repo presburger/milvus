@@ -108,6 +108,7 @@ VecIndexCreator::parse_impl(const std::string& serialized_params_str, knowhere::
     check_parameter<int>(conf, knowhere::indexparam::OUTGOING_EDGE_SIZE, stoi_closure, std::nullopt);
     check_parameter<int>(conf, knowhere::indexparam::INCOMING_EDGE_SIZE, stoi_closure, std::nullopt);
 #endif
+    check_parameter<int>(conf, "gpu_id", stoi_closure, 0);
 }
 
 void

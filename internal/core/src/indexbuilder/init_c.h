@@ -10,7 +10,6 @@
 // or implied. See the License for the specific language governing permissions and limitations under the License
 
 #pragma once
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -24,6 +23,12 @@ IndexBuilderSetSimdType(const char*);
 
 void
 IndexBuilderSetIndexSliceSize(const int64_t);
+
+void
+IndexBuilderInitGPUResource(int cnt, ...);
+
+void
+IndexBuilderFreeGPUResource();
 
 #ifdef __cplusplus
 };
