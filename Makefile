@@ -19,7 +19,7 @@ INSTALL_PATH := $(PWD)/bin
 LIBRARY_PATH := $(PWD)/lib
 OS := $(shell uname -s)
 ARCH := $(shell arch)
-mode = Release
+mode = Debug
 disk_index = OFF
 
 

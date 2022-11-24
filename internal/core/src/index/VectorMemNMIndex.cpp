@@ -19,19 +19,16 @@
 #include "index/VectorMemNMIndex.h"
 #include "log/Log.h"
 
-#include "knowhere/index/VecIndexFactory.h"
-#include "knowhere/common/Timer.h"
-#include "knowhere/index/vector_index/ConfAdapterMgr.h"
-#include "knowhere/index/vector_index/adapter/VectorAdapter.h"
+#include "knowhere/knowhere.h"
+#include "knowhere/comp/Timer.h"
+#define RAW_DATA "RAW_DATA"
 
 namespace milvus::index {
 
 BinarySet
 VectorMemNMIndex::Serialize(const Config& config) {
-    knowhere::Config serialize_config = config;
-    parse_config(serialize_config);
-
-    auto ret = index_->Serialize(serialize_config);
+    knowhere::BinarySet ret;
+    index_.Serialization(ret);
     auto deleter = [&](uint8_t*) {};  // avoid repeated deconstruction
     auto raw_data = std::shared_ptr<uint8_t[]>(static_cast<uint8_t*>(raw_data_.data()), deleter);
     ret.Append(RAW_DATA, raw_data, raw_data_.size());
@@ -67,11 +64,11 @@ VectorMemNMIndex::Query(const DatasetPtr dataset, const SearchInfo& search_info,
 }
 
 void
-VectorMemNMIndex::store_raw_data(const knowhere::DatasetPtr& dataset) {
+VectorMemNMIndex::store_raw_data(const DatasetPtr& dataset) {
     auto index_type = GetIndexType();
-    auto tensor = knowhere::GetDatasetTensor(dataset);
-    auto row_num = knowhere::GetDatasetRows(dataset);
-    auto dim = knowhere::GetDatasetDim(dataset);
+    auto tensor = dataset->GetTensor();
+    auto row_num = dataset->GetRows();
+    auto dim = dataset->GetDim();
     int64_t data_size;
     if (is_in_bin_list(index_type)) {
         data_size = dim / 8 * row_num;
@@ -84,13 +81,14 @@ VectorMemNMIndex::store_raw_data(const knowhere::DatasetPtr& dataset) {
 
 void
 VectorMemNMIndex::LoadRawData() {
-    auto bs = index_->Serialize(Config{});
+    knowhere::BinarySet bs;
+    index_.Serialization(bs);
     auto bptr = std::make_shared<knowhere::Binary>();
     auto deleter = [&](uint8_t*) {};  // avoid repeated deconstruction
     bptr->data = std::shared_ptr<uint8_t[]>(static_cast<uint8_t*>(raw_data_.data()), deleter);
     bptr->size = raw_data_.size();
     bs.Append(RAW_DATA, bptr);
-    index_->Load(bs);
+    index_.Deserialization(bs);
 }
 
 }  // namespace milvus::index

@@ -14,9 +14,8 @@
 
 #include "SearchBruteForce.h"
 #include "SubSearchResult.h"
-#include "knowhere/archive/BruteForce.h"
-#include "knowhere/index/vector_index/adapter/VectorAdapter.h"
-
+#include "knowhere/comp/brute_force.h"
+#include "knowhere/comp/index_param.h"
 namespace milvus::query {
 
 void
@@ -42,9 +41,9 @@ BruteForceSearch(const dataset::SearchDataset& dataset,
         auto dim = dataset.dim;
         auto topk = dataset.topk;
 
-        auto base_dataset = knowhere::GenDataset(chunk_rows, dim, chunk_data_raw);
-        auto query_dataset = knowhere::GenDataset(nq, dim, dataset.query_data);
-        auto config = knowhere::Config{
+        auto base_dataset = knowhere::GenDataSet(chunk_rows, dim, chunk_data_raw);
+        auto query_dataset = knowhere::GenDataSet(nq, dim, dataset.query_data);
+        auto config = knowhere::Json{
             {knowhere::meta::METRIC_TYPE, dataset.metric_type},
             {knowhere::meta::DIM, dim},
             {knowhere::meta::TOPK, topk},
@@ -54,8 +53,8 @@ BruteForceSearch(const dataset::SearchDataset& dataset,
         sub_result.mutable_seg_offsets().resize(nq * topk);
         sub_result.mutable_distances().resize(nq * topk);
 
-        std::copy_n(knowhere::GetDatasetIDs(result), nq * topk, sub_result.get_seg_offsets());
-        std::copy_n(knowhere::GetDatasetDistance(result), nq * topk, sub_result.get_distances());
+        std::copy_n(result.value()->GetIds(), nq * topk, sub_result.get_seg_offsets());
+        std::copy_n(result.value()->GetDistance(), nq * topk, sub_result.get_distances());
     } catch (std::exception& e) {
         PanicInfo(e.what());
     }

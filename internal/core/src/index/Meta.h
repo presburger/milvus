@@ -16,8 +16,7 @@
 
 #pragma once
 
-#include "knowhere/index/IndexType.h"
-#include "knowhere/index/vector_index/helpers/IndexParameter.h"
+#include "knowhere/comp/index_param.h"
 
 namespace milvus::index {
 constexpr const char* OPERATOR_TYPE = "operator_type";

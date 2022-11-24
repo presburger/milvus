@@ -20,9 +20,11 @@
 
 #include "index/VectorIndex.h"
 #include "storage/DiskFileManagerImpl.h"
+
+#ifdef BUILD_DISK_ANN
 #include "knowhere/index/vector_index/IndexDiskANN.h"
 #include "knowhere/index/vector_index/IndexDiskANNConfig.h"
-
+#endif
 namespace milvus::index {
 
 #ifdef BUILD_DISK_ANN
