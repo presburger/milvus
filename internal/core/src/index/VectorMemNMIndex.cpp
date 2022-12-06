@@ -28,7 +28,10 @@ namespace milvus::index {
 BinarySet
 VectorMemNMIndex::Serialize(const Config& config) {
     knowhere::BinarySet ret;
-    index_.Serialization(ret);
+    auto stat = index_.Serialize(ret);
+    if (stat != knowhere::Status::success)
+        PanicCodeInfo(ErrorCodeEnum::UnexpectedError, "failed to serialize index");
+
     auto deleter = [&](uint8_t*) {};  // avoid repeated deconstruction
     auto raw_data = std::shared_ptr<uint8_t[]>(static_cast<uint8_t*>(raw_data_.data()), deleter);
     ret.Append(RAW_DATA, raw_data, raw_data_.size());
@@ -82,13 +85,18 @@ VectorMemNMIndex::store_raw_data(const DatasetPtr& dataset) {
 void
 VectorMemNMIndex::LoadRawData() {
     knowhere::BinarySet bs;
-    index_.Serialization(bs);
+    auto stat = index_.Serialize(bs);
+    if (stat != knowhere::Status::success)
+        PanicCodeInfo(ErrorCodeEnum::UnexpectedError, "failed to Serialize index");
+
     auto bptr = std::make_shared<knowhere::Binary>();
     auto deleter = [&](uint8_t*) {};  // avoid repeated deconstruction
     bptr->data = std::shared_ptr<uint8_t[]>(static_cast<uint8_t*>(raw_data_.data()), deleter);
     bptr->size = raw_data_.size();
     bs.Append(RAW_DATA, bptr);
-    index_.Deserialization(bs);
+    stat = index_.Deserialize(bs);
+    if (stat != knowhere::Status::success)
+        PanicCodeInfo(ErrorCodeEnum::UnexpectedError, "failed to Deserialize index");
 }
 
 }  // namespace milvus::index

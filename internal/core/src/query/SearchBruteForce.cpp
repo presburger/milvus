@@ -53,8 +53,12 @@ BruteForceSearch(const dataset::SearchDataset& dataset,
         sub_result.mutable_seg_offsets().resize(nq * topk);
         sub_result.mutable_distances().resize(nq * topk);
 
-        std::copy_n(result.value()->GetIds(), nq * topk, sub_result.get_seg_offsets());
-        std::copy_n(result.value()->GetDistance(), nq * topk, sub_result.get_distances());
+        if (result.has_value()) {
+            std::copy_n(result.value()->GetIds(), nq * topk, sub_result.get_seg_offsets());
+            std::copy_n(result.value()->GetDistance(), nq * topk, sub_result.get_distances());
+        } else {
+            throw std::invalid_argument("invalid metric type");
+        }
     } catch (std::exception& e) {
         PanicInfo(e.what());
     }

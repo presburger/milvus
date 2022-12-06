@@ -37,7 +37,9 @@ VectorMemIndex::VectorMemIndex(const IndexType& index_type, const MetricType& me
 BinarySet
 VectorMemIndex::Serialize(const Config& config) {
     knowhere::BinarySet ret;
-    index_.Serialization(ret);
+    auto stat = index_.Serialize(ret);
+    if (stat != knowhere::Status::success)
+        PanicCodeInfo(ErrorCodeEnum::UnexpectedError, "failed to serialize index");
     milvus::Disassemble(ret);
 
     return ret;
@@ -46,8 +48,10 @@ VectorMemIndex::Serialize(const Config& config) {
 void
 VectorMemIndex::Load(const BinarySet& binary_set, const Config& config) {
     milvus::Assemble(const_cast<BinarySet&>(binary_set));
-    index_.Deserialization(binary_set);
-    SetDim(index_.Dims());
+    auto stat = index_.Deserialize(binary_set);
+    if (stat != knowhere::Status::success)
+        PanicCodeInfo(ErrorCodeEnum::UnexpectedError, "failed to Deserialize index");
+    SetDim(index_.Dim());
 }
 
 void
@@ -58,9 +62,11 @@ VectorMemIndex::BuildWithDataset(const DatasetPtr& dataset, const Config& config
     SetDim(dataset->GetDim());
 
     knowhere::TimeRecorder rc("BuildWithoutIds", 1);
-    index_.Build(*dataset, index_config);
+    auto stat = index_.Build(*dataset, index_config);
+    if (stat != knowhere::Status::success)
+        PanicCodeInfo(ErrorCodeEnum::BuildIndexError, "failed to build index");
     rc.ElapseFromBegin("Done");
-    SetDim(index_.Dims());
+    SetDim(index_.Dim());
 }
 
 std::unique_ptr<SearchResult>
@@ -78,7 +84,8 @@ VectorMemIndex::Query(const DatasetPtr dataset, const SearchInfo& search_info, c
         auto index_type = GetIndexType();
         return index_.Search(*dataset, search_conf, bitset);
     }();
-
+    if (!final.has_value())
+        PanicCodeInfo(ErrorCodeEnum::UnexpectedError, "failed to search");
     auto ids = final.value()->GetIds();
     float* distances = const_cast<float*>(final.value()->GetDistance());
     final.value()->SetIsOwner(false);

@@ -12,9 +12,6 @@
 #include <google/protobuf/text_format.h>
 #include <gtest/gtest.h>
 #include <tuple>
-#include <knowhere/index/vector_index/helpers/IndexParameter.h>
-#include <knowhere/index/vector_index/adapter/VectorAdapter.h>
-#include <knowhere/index/vector_index/ConfAdapterMgr.h>
 #include "pb/index_cgo_msg.pb.h"
 
 #include "indexbuilder/index_c.h"
@@ -129,7 +126,7 @@ TEST(BinaryVecIndex, All) {
 
 TEST(CBoolIndexTest, All) {
     schemapb::BoolArray half;
-    knowhere::DatasetPtr half_ds;
+    knowhere::DataSetPtr half_ds;
 
     for (size_t i = 0; i < NB; i++) {
         *(half.mutable_data()->Add()) = (i % 2) == 0;
@@ -154,7 +151,7 @@ TEST(CBoolIndexTest, All) {
             ASSERT_EQ(Success, status.error_code);
         }
         {
-            status = BuildScalarIndex(index, knowhere::GetDatasetRows(half_ds), knowhere::GetDatasetTensor(half_ds));
+            status = BuildScalarIndex(index, half_ds->GetRows(), half_ds->GetTensor());
             ASSERT_EQ(Success, status.error_code);
         }
         {
@@ -180,7 +177,7 @@ TEST(CBoolIndexTest, All) {
         }
     }
 
-    delete[](char*) knowhere::GetDatasetTensor(half_ds);
+    delete[](char*)(half_ds->GetTensor());
 }
 
 // TODO: more scalar type.
@@ -258,7 +255,7 @@ TEST(CStringIndexTest, All) {
             ASSERT_EQ(Success, status.error_code);
         }
         {
-            status = BuildScalarIndex(index, knowhere::GetDatasetRows(str_ds), knowhere::GetDatasetTensor(str_ds));
+            status = BuildScalarIndex(index, (str_ds->GetRows()), (str_ds->GetTensor()));
             ASSERT_EQ(Success, status.error_code);
         }
         {
@@ -284,6 +281,6 @@ TEST(CStringIndexTest, All) {
         }
     }
 
-    delete[](char*) knowhere::GetDatasetTensor(str_ds);
+    delete[](char*)(str_ds->GetTensor());
 }
 #endif
