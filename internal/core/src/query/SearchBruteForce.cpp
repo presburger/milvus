@@ -48,15 +48,14 @@ BruteForceSearch(const dataset::SearchDataset& dataset,
             {knowhere::meta::DIM, dim},
             {knowhere::meta::TOPK, topk},
         };
-        auto result = knowhere::BruteForce::Search(base_dataset, query_dataset, config, bitset);
-
         sub_result.mutable_seg_offsets().resize(nq * topk);
         sub_result.mutable_distances().resize(nq * topk);
 
-        if (result.has_value()) {
-            std::copy_n(result.value()->GetIds(), nq * topk, sub_result.get_seg_offsets());
-            std::copy_n(result.value()->GetDistance(), nq * topk, sub_result.get_distances());
-        } else {
+        auto stat =
+            knowhere::BruteForce::SearchWithBuf(base_dataset, query_dataset, sub_result.mutable_seg_offsets().data(),
+                                                sub_result.mutable_distances().data(), config, bitset);
+
+        if (stat != knowhere::Status::success) {
             throw std::invalid_argument("invalid metric type");
         }
     } catch (std::exception& e) {
