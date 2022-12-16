@@ -19,7 +19,7 @@
 #include "index/VectorMemNMIndex.h"
 #include "log/Log.h"
 
-#include "knowhere/knowhere.h"
+#include "knowhere/factory.h"
 #include "knowhere/comp/Timer.h"
 #define RAW_DATA "RAW_DATA"
 

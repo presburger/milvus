@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
-#include "knowhere/knowhere.h"
+#include "knowhere/factory.h"
 #include "index/VectorIndex.h"
 
 namespace milvus::index {

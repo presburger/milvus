@@ -20,7 +20,7 @@
 #include "exceptions/EasyAssert.h"
 #include "config/ConfigKnowhere.h"
 
-#include "knowhere/knowhere.h"
+#include "knowhere/factory.h"
 #include "knowhere/comp/Timer.h"
 #include "common/BitsetView.h"
 #include "common/Slice.h"

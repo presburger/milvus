@@ -21,7 +21,7 @@
 #include <string>
 #include <boost/dynamic_bitset.hpp>
 
-#include "knowhere/knowhere.h"
+#include "knowhere/factory.h"
 #include "index/Index.h"
 #include "common/Types.h"
 #include "common/BitsetView.h"
