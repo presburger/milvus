@@ -20,7 +20,7 @@ LIBRARY_PATH := $(PWD)/lib
 OS := $(shell uname -s)
 ARCH := $(shell arch)
 mode = Release
-disk_index = OFF
+disk_index = ON
 
 
 export GIT_BRANCH=master

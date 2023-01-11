@@ -19,10 +19,6 @@
 #include <unordered_set>
 
 #include "common/LoadInfo.h"
-#include "knowhere/index/VecIndexFactory.h"
-#include "knowhere/index/vector_index/IndexIVFPQ.h"
-#include "knowhere/index/vector_index/helpers/IndexParameter.h"
-#include "knowhere/index/vector_index/adapter/VectorAdapter.h"
 #include "pb/plan.pb.h"
 #include "query/ExprImpl.h"
 #include "segcore/Collection.h"
@@ -202,7 +198,7 @@ generate_index(
     CreateIndexInfo create_index_info{field_type, index_type, metric_type};
     auto indexing = milvus::index::IndexFactory::GetInstance().CreateIndex(create_index_info, nullptr);
 
-    auto database = knowhere::GenDataset(N, dim, raw_data);
+    auto database = knowhere::GenDataSet(N, dim, raw_data);
     auto build_config = generate_build_conf(index_type, metric_type);
     indexing->BuildWithDataset(database, build_config);
 
@@ -1398,8 +1394,8 @@ TEST(CApiTest, LoadIndexInfo) {
 
     auto N = 1024 * 10;
     auto [raw_data, timestamps, uids] = generate_data(N);
-    auto indexing = std::make_shared<knowhere::IVFPQ>();
-    auto conf = knowhere::Config{{knowhere::meta::METRIC_TYPE, knowhere::metric::L2},
+    auto indexing = knowhere::IndexFactory::Instance().Create("IVFPQ");
+    auto conf = knowhere::Json{{knowhere::meta::METRIC_TYPE, knowhere::metric::L2},
                                  {knowhere::meta::DIM, DIM},
                                  {knowhere::meta::TOPK, TOPK},
                                  {knowhere::indexparam::NLIST, 100},
@@ -1408,12 +1404,13 @@ TEST(CApiTest, LoadIndexInfo) {
                                  {knowhere::indexparam::NBITS, 8},
                                  {knowhere::meta::DEVICE_ID, 0}};
 
-    auto database = knowhere::GenDataset(N, DIM, raw_data.data());
-    indexing->Train(database, conf);
-    indexing->AddWithoutIds(database, conf);
-    EXPECT_EQ(indexing->Count(), N);
-    EXPECT_EQ(indexing->Dim(), DIM);
-    auto binary_set = indexing->Serialize(conf);
+    auto database = knowhere::GenDataSet(N, DIM, raw_data.data());
+    indexing.Train(*database, conf);
+    indexing.Add(*database, conf);
+    EXPECT_EQ(indexing.Count(), N);
+    EXPECT_EQ(indexing.Dim(), DIM);
+    knowhere::BinarySet binary_set;
+    indexing.Serialize(binary_set);
     CBinarySet c_binary_set = (CBinarySet)&binary_set;
 
     void* c_load_index_info = nullptr;
@@ -1445,8 +1442,8 @@ TEST(CApiTest, LoadIndex_Search) {
     auto N = 1024 * 1024;
     auto num_query = 100;
     auto [raw_data, timestamps, uids] = generate_data(N);
-    auto indexing = std::make_shared<knowhere::IVFPQ>();
-    auto conf = knowhere::Config{{knowhere::meta::METRIC_TYPE, knowhere::metric::L2},
+    auto indexing = knowhere::IndexFactory::Instance().Create("IVFPQ");
+    auto conf = knowhere::Json{{knowhere::meta::METRIC_TYPE, knowhere::metric::L2},
                                  {knowhere::meta::DIM, DIM},
                                  {knowhere::meta::TOPK, TOPK},
                                  {knowhere::indexparam::NLIST, 100},
@@ -1455,15 +1452,16 @@ TEST(CApiTest, LoadIndex_Search) {
                                  {knowhere::indexparam::NBITS, 8},
                                  {knowhere::meta::DEVICE_ID, 0}};
 
-    auto database = knowhere::GenDataset(N, DIM, raw_data.data());
-    indexing->Train(database, conf);
-    indexing->AddWithoutIds(database, conf);
+    auto database = knowhere::GenDataSet(N, DIM, raw_data.data());
+    indexing.Train(*database, conf);
+    indexing.Add(*database, conf);
 
-    EXPECT_EQ(indexing->Count(), N);
-    EXPECT_EQ(indexing->Dim(), DIM);
+    EXPECT_EQ(indexing.Count(), N);
+    EXPECT_EQ(indexing.Dim(), DIM);
 
     // serializ index to binarySet
-    auto binary_set = indexing->Serialize(conf);
+    knowhere::BinarySet binary_set;
+    indexing.Serialize(binary_set);
 
     // fill loadIndexInfo
     milvus::segcore::LoadIndexInfo load_index_info;
@@ -1475,12 +1473,12 @@ TEST(CApiTest, LoadIndex_Search) {
     load_index_info.index->Load(binary_set);
 
     // search
-    auto query_dataset = knowhere::GenDataset(num_query, DIM, raw_data.data() + DIM * 4200);
+    auto query_dataset = knowhere::GenDataSet(num_query, DIM, raw_data.data() + DIM * 4200);
 
-    auto result = indexing->Query(query_dataset, conf, nullptr);
+    auto result = indexing.Search(*query_dataset, conf, nullptr);
 
-    auto ids = knowhere::GetDatasetIDs(result);
-    auto dis = knowhere::GetDatasetDistance(result);
+    auto ids = (result.value()->GetIds());
+    auto dis = (result.value()->GetDistance());
     // for (int i = 0; i < std::min(num_query * K, 100); ++i) {
     //    std::cout << ids[i] << "->" << dis[i] << std::endl;
     //}
@@ -1552,7 +1550,7 @@ TEST(CApiTest, Indexing_Without_Predicate) {
                                    IndexEnum::INDEX_FAISS_IVFPQ, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -1673,7 +1671,7 @@ TEST(CApiTest, Indexing_Expr_Without_Predicate) {
                                    IndexEnum::INDEX_FAISS_IVFPQ, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -1811,7 +1809,7 @@ TEST(CApiTest, Indexing_With_float_Predicate_Range) {
                                    IndexEnum::INDEX_FAISS_IVFPQ, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -1963,7 +1961,7 @@ TEST(CApiTest, Indexing_Expr_With_float_Predicate_Range) {
                                    IndexEnum::INDEX_FAISS_IVFPQ, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -2099,7 +2097,7 @@ TEST(CApiTest, Indexing_With_float_Predicate_Term) {
                                    IndexEnum::INDEX_FAISS_IVFPQ, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -2244,7 +2242,7 @@ TEST(CApiTest, Indexing_Expr_With_float_Predicate_Term) {
                                    IndexEnum::INDEX_FAISS_IVFPQ, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -2382,7 +2380,7 @@ TEST(CApiTest, Indexing_With_binary_Predicate_Range) {
                                    IndexEnum::INDEX_FAISS_BIN_IVFFLAT, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -2532,7 +2530,7 @@ TEST(CApiTest, Indexing_Expr_With_binary_Predicate_Range) {
                                    IndexEnum::INDEX_FAISS_BIN_IVFFLAT, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -2669,7 +2667,7 @@ TEST(CApiTest, Indexing_With_binary_Predicate_Term) {
                                    IndexEnum::INDEX_FAISS_BIN_IVFFLAT, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -2830,7 +2828,7 @@ TEST(CApiTest, Indexing_Expr_With_binary_Predicate_Term) {
                                    IndexEnum::INDEX_FAISS_BIN_IVFFLAT, DIM, N);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
@@ -3025,7 +3023,7 @@ TEST(CApiTest, SealedSegment_search_float_Predicate_Range) {
     AppendIndex(c_load_index_info, (CBinarySet)&binary_set);
 
     auto load_index_info = (LoadIndexInfo*)c_load_index_info;
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     SearchInfo search_info;
     search_info.topk_ = TOPK;
@@ -3336,7 +3334,7 @@ TEST(CApiTest, SealedSegment_search_float_With_Expr_Predicate_Range) {
     assert(status.error_code == Success);
 
     // gen query dataset
-    auto query_dataset = knowhere::GenDataset(num_queries, DIM, query_ptr);
+    auto query_dataset = knowhere::GenDataSet(num_queries, DIM, query_ptr);
     auto vec_index = dynamic_cast<VectorIndex*>(indexing.get());
     auto search_plan = reinterpret_cast<milvus::query::Plan*>(plan);
     SearchInfo search_info = search_plan->plan_node_->search_info_;
