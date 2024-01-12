@@ -12,8 +12,8 @@
 #-------------------------------------------------------------------------------
 
 # Update KNOWHERE_VERSION for the first occurrence
-set( KNOWHERE_VERSION 20a6289 )
-set( GIT_REPOSITORY  "https://github.com/zilliztech/knowhere.git")
+set( KNOWHERE_VERSION 637a2a728ec57f5382fb0b830224c6012a41699b )
+set( GIT_REPOSITORY  "https://github.com/Presburger/knowhere.git")
 if ( INDEX_ENGINE STREQUAL "cardinal" )
     set( KNOWHERE_VERSION main )
     set( GIT_REPOSITORY  "https://github.com/zilliztech/knowhere-cloud.git")
