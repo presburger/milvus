@@ -124,8 +124,8 @@ if (LINUX OR MSYS)
     append_flags( CMAKE_CXX_FLAGS
                   FLAGS
                   "-fPIC"
+                  "-lomp"
                   "-DELPP_THREAD_SAFE"
-                  "-fopenmp"
                   "-Wno-error"
                   "-Wno-all"
                   )
@@ -146,7 +146,7 @@ if ( APPLE )
             FLAGS
             "-fPIC"
             "-DELPP_THREAD_SAFE"
-            "-fopenmp"
+            "-lomp"
             "-pedantic"
             "-Wno-all"
             "-DBOOST_STACKTRACE_GNU_SOURCE_NOT_REQUIRED=1"
