@@ -14,9 +14,31 @@
 #include <memory>
 #include <string>
 
+#ifndef MILVUS_LITE
 #include "opentelemetry/trace/provider.h"
 
+#endif
 #define TRACE_SERVICE_SEGCORE "segcore"
+
+#ifdef MILVUS_LITE
+namespace trace {
+
+class Span {
+ public:
+    void
+    End() {
+    }
+};
+class Tracer {
+ public:
+    static int
+    WithActiveSpan(std::shared_ptr<Span>& span) noexcept {
+        return 0;
+    }
+};
+
+};  // namespace trace
+#endif
 
 namespace milvus::tracer {
 
@@ -36,8 +58,10 @@ struct TraceContext {
     const uint8_t* spanID = nullptr;
     uint8_t traceFlags = 0;
 };
-namespace trace = opentelemetry::trace;
 
+#ifndef MILVUS_LITE
+namespace trace = opentelemetry::trace;
+#endif
 void
 initTelemetry(const TraceConfig& cfg);
 

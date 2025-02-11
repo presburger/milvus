@@ -10,8 +10,12 @@
 // or implied. See the License for the specific language governing permissions and limitations under the License
 
 #include "Tracer.h"
+
+#ifndef MILVUS_LITE
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_factory.h>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter_options.h>
+#endif
+
 #include "log/Log.h"
 
 #include <atomic>
@@ -20,6 +24,7 @@
 #include <iostream>
 #include <utility>
 
+#ifndef MILVUS_LITE
 #include "opentelemetry/exporters/jaeger/jaeger_exporter_factory.h"
 #include "opentelemetry/exporters/ostream/span_exporter_factory.h"
 #include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
@@ -32,9 +37,11 @@
 #include "opentelemetry/sdk/version/version.h"
 #include "opentelemetry/trace/span_context.h"
 #include "opentelemetry/trace/span_metadata.h"
+#endif
 
 namespace milvus::tracer {
 
+#ifndef MILVUS_LITE
 namespace trace = opentelemetry::trace;
 namespace nostd = opentelemetry::nostd;
 
@@ -276,5 +283,114 @@ AutoSpan::~AutoSpan() {
         CloseRootSpan();
     }
 }
+#endif
+
+#ifdef MILVUS_LITE
+void
+initTelemetry(const TraceConfig& cfg) {
+}
+
+std::shared_ptr<trace::Tracer>
+GetTracer() {
+    return std::make_shared<trace::Tracer>();
+}
+
+std::shared_ptr<trace::Span>
+StartSpan(const std::string& name, TraceContext* parentCtx) {
+    return std::make_shared<trace::Span>();
+}
+
+std::shared_ptr<trace::Span>
+StartSpan(const std::string& name, const std::shared_ptr<trace::Span>& span) {
+    return std::make_shared<trace::Span>();
+}
+
+std::string
+GetTraceID() {
+    return "";
+}
+
+void
+SetRootSpan(std::shared_ptr<trace::Span> span) {
+}
+
+std::shared_ptr<trace::Span>
+GetRootSpan() {
+    return nullptr;
+}
+
+void
+CloseRootSpan() {
+}
+
+void
+AddEvent(const std::string& event_label) {
+}
+
+bool
+isEmptyID(const uint8_t* id, int length) {
+    return true;
+}
+
+bool
+EmptyTraceID(const TraceContext* ctx) {
+    return true;
+}
+
+bool
+EmptySpanID(const TraceContext* ctx) {
+    return true;
+}
+
+std::string
+BytesToHexStr(const uint8_t* data, const size_t len) {
+    return "";
+}
+
+std::string
+GetIDFromHexStr(const std::string& hexStr) {
+    return "";
+}
+
+std::string
+GetTraceIDAsHexStr(const TraceContext* ctx) {
+    return "";
+}
+
+std::string
+GetSpanIDAsHexStr(const TraceContext* ctx) {
+    return "";
+}
+
+AutoSpan::AutoSpan(const std::string& name,
+                   TraceContext* ctx,
+                   bool is_root_span)
+    : is_root_span_(is_root_span) {
+    span_ = StartSpan(name, ctx);
+    if (is_root_span) {
+        SetRootSpan(span_);
+    }
+}
+
+AutoSpan::AutoSpan(const std::string& name,
+                   const std::shared_ptr<trace::Span>& span)
+    : is_root_span_(false) {
+    span_ = StartSpan(name, span);
+}
+
+std::shared_ptr<trace::Span>
+AutoSpan::GetSpan() {
+    return span_;
+}
+
+AutoSpan::~AutoSpan() {
+    if (span_ != nullptr) {
+        span_->End();
+    }
+    if (is_root_span_) {
+        CloseRootSpan();
+    }
+}
+#endif
 
 }  // namespace milvus::tracer

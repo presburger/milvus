@@ -43,4 +43,17 @@ if(USE_OPENDAL)
     set(SOURCE_FILES ${SOURCE_FILES} opendal/OpenDALChunkManager.cpp)
 endif()
 
+
+set(SOURCE_FILES_TO_REMOVE
+ChunkManager.cpp
+MinioChunkManager.cpp
+AliyunSTSClient.cpp
+AliyunCredentialsProvider.cpp
+TencentCloudCredentialsProvider.cpp
+TencentCloudSTSClient.cpp
+)
+
+list(REMOVE_ITEM SOURCE_FILES ${SOURCE_FILES_TO_REMOVE})
+
+
 add_library(milvus_storage OBJECT ${SOURCE_FILES})
