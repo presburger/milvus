@@ -57,7 +57,7 @@ export CFLAGS="-Wno-error=address -Wno-error=deprecated-declarations"
 CONAN_ARTIFACTORY_URL="${CONAN_ARTIFACTORY_URL:-https://milvus01.jfrog.io/artifactory/api/conan/default-conan-local}"
 
 if [[ ! `conan remote list` == *default-conan-local* ]]; then
-    conan remote add default-conan-local $CONAN_ARTIFACTORY_URL
+    conan remote add default-conan-local $CONAN_ARTIFACTORY_URL false
 fi
 
 unameOut="$(uname -s)"
