@@ -141,12 +141,39 @@ if (LINUX OR MSYS)
     endif()
 endif ()
 
+if(APPLE)
+  if(DEFINED ENV{HOMEBREW_PREFIX})
+    message(STATUS "Homebrew prefix from environment: $ENV{HOMEBREW_PREFIX}")
+    set(OMP_INCLUDE $ENV{HOMEBREW_PREFIX}/opt/libomp/include)
+    include_directories($ENV{HOMEBREW_PREFIX}/opt/libomp/include)
+    link_directories($ENV{HOMEBREW_PREFIX}/opt/libomp/lib)
+
+  else()
+    message(STATUS "Homebrew prefix from environment not found, use default")
+    set(OMP_INCLUDE /opt/homebrew/opt/libomp/include)
+    include_directories(/opt/homebrew/opt/libomp/include)
+    link_directories(/opt/homebrew/opt/libomp/lib)
+  endif()
+
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lomp")
+  set(OpenMP_C "${CMAKE_C_COMPILER}")
+  set(OpenMP_C_FLAGS "-Xclang -fopenmp -I${OMP_INCLUDE}")
+  set(OpenMP_C_LIB_NAMES "libomp")
+  set(OpenMP_libomp_LIBRARY "omp")
+
+  set(OpenMP_CXX "${CMAKE_CXX_COMPILER}")
+  set(OpenMP_CXX_FLAGS "-Xclang -fopenmp -I${OMP_INCLUDE}")
+  set(OpenMP_CXX_LIB_NAMES "libomp")
+  set(OpenMP_libomp_LIBRARY "omp")
+endif()
+
+
+
 if ( APPLE )
     append_flags( CMAKE_CXX_FLAGS
             FLAGS
             "-fPIC"
             "-DELPP_THREAD_SAFE"
-            "-fopenmp"
             "-pedantic"
             "-Wall"
             "-D_DARWIN_C_SOURCE"
