@@ -25,10 +25,11 @@ var ErrWALAccesserClosed = status.NewOnShutdownError("wal accesser closed")
 // newWALAccesser creates a new wal accesser.
 func newWALAccesser(c *clientv3.Client) *walAccesserImpl {
 	// Create a new streaming coord client.
-	streamingCoordClient := client.NewClient(c)
+	var streamingCoordClient client.Client
 	// Create a new streamingnode handler client.
 	var handlerClient handler.HandlerClient
 	if streamingutil.IsStreamingServiceEnabled() {
+		streamingCoordClient = client.NewClient(c)
 		// streaming service is enabled, create the handler client for the streaming service.
 		handlerClient = handler.NewHandlerClient(streamingCoordClient.Assignment())
 	}
@@ -156,7 +157,10 @@ func (w *walAccesserImpl) Close() {
 	if w.handlerClient != nil {
 		w.handlerClient.Close()
 	}
-	w.streamingCoordClient.Close()
+
+	if w.streamingCoordClient != nil {
+		w.streamingCoordClient.Close()
+	}
 }
 
 // newErrScanner creates a scanner that returns an error.
