@@ -47,10 +47,7 @@ const (
 
 	HeaderAuthorize = "authorization"
 	HeaderToken     = "token"
-	// HeaderSourceID identify requests from Milvus members and client requests
-	HeaderSourceID = "sourceId"
-	// MemberCredID id for Milvus members (data/index/query node/coord component)
-	MemberCredID        = "@@milvus-member@@"
+
 	CredentialSeperator = ":"
 	UserRoot            = "root"
 	PasswordHolder      = "___"
