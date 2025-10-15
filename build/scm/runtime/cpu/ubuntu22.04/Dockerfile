@@ -9,18 +9,37 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing permissions and limitations under the License.
 
-FROM hub.byted.org/ubuntu:jammy-20240530
+ARG REGION
 
+FROM ubuntu:jammy-20240530 as us-east
+
+FROM ubuntu:jammy-20240530 as us-ttp
+
+FROM ubuntu:jammy-20240530 as us-east-red
+
+FROM ubuntu:jammy-20240530 as aliyun_va
+
+FROM ubuntu:jammy-20240530 as aliyun_sg
+
+FROM hub.byted.org/ubuntu:jammy-20240530 as china-north-lf
+
+FROM ${REGION}
+
+# REGION 要想在FROM之后使用，必须再次声明ARG
+ARG REGION
 ARG TARGETARCH
 ARG MILVUS_ASAN_LIB
 
-ENV TZ=Asia/Shanghai
 RUN apt-get update && \
     apt-get install -y --no-install-recommends systemd tzdata wget curl ca-certificates libaio-dev libgomp1 libopenblas-dev && \
     apt-get remove --purge -y && \
-    rm -rf /var/lib/apt/lists/* && \
-    ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
-    echo $TZ > /etc/timezone
+    rm -rf /var/lib/apt/lists/*
+
+RUN if [ "$REGION" = "china-north-lf" ]; then \
+      TZ=Asia/Shanghai && \
+      ln -fs /usr/share/zoneinfo/$TZ /etc/localtime && \
+      echo $TZ > /etc/timezone; \
+    fi
 
 # Add Tini
 RUN curl -L -o /tini https://github.com/krallin/tini/releases/download/v0.19.0/tini-$TARGETARCH && \
