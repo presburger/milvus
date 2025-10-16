@@ -1,0 +1,40 @@
+name: Sync Branches from Github Repository
+trigger: 
+  cron:
+  manual:
+jobs:
+  sync_master: &sync_job
+    image: hub.byted.org/codebase/ci_debian_bullseye
+    allow-push: true
+    auto-checkout: true
+    envs:
+      SYNC_BRANCH: master
+    steps:
+      - uses: actions/setup-proxy
+      - name: Configure Git identity
+        commands:
+          - git config --global user.name "GitHub Sync Bot"
+          - git config --global user.email "sync-bot@example.com"
+
+      - name: Add public repository as remote
+        commands:
+          - git remote add public-repo https://github.com/milvus-io/milvus.git || true
+
+      - name: Fetch latest code from public repository
+        commands:
+          - git fetch public-repo $SYNC_BRANCH
+
+      - name: Sync to github repository community branch
+        commands:
+          - target_branch="community/$SYNC_BRANCH"
+          - git checkout -B $target_branch public-repo/$SYNC_BRANCH
+          - git push origin $target_branch -f
+
+  sync_2.6:
+    <<: *sync_job
+    envs:
+      SYNC_BRANCH: 2.6
+  sync_2.5:
+    <<: *sync_job
+    envs:
+      SYNC_BRANCH: 2.5
