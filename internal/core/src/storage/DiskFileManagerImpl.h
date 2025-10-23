@@ -136,6 +136,33 @@ class DiskFileManagerImpl : public FileManagerImpl {
     std::string
     GetFileName(const std::string& localfile);
 
+    // @bytedance begin
+    void
+    SetIsLegacyDiskann(bool is_legacy_diskann) {
+        is_legacy_diskann_ = is_legacy_diskann;  // store flag for later inspection
+    }
+
+    bool
+    IsLegacyDiskann() const {
+        return is_legacy_diskann_;
+    }
+
+    void
+    SetUseDiskannMemory(bool enabled) {
+        use_diskann_memory_ = enabled;
+    }
+    
+    bool
+    IsDiskannMemoryEnabled() const {
+        return use_diskann_memory_;
+    }
+
+    size_t
+    GetDiskannLoadMemorySize() const {
+        return diskann_load_memory_size_;
+    }
+    // @bytedance end
+
  private:
     int64_t
     GetIndexBuildId() {
@@ -156,6 +183,11 @@ class DiskFileManagerImpl : public FileManagerImpl {
                     const std::function<std::string(const std::string&, int)>&
                         get_remote_path) noexcept;
 
+    // Helper: accumulate DiskANN preload memory size based on original filename
+    void
+    AccumulateDiskannLoadMemorySizeFromFilename(const std::string& file_name,
+                                                 size_t file_size);
+
     void
     CacheIndexToDiskInternal(
         const std::vector<std::string>& remote_files,
@@ -169,6 +201,15 @@ class DiskFileManagerImpl : public FileManagerImpl {
     std::map<std::string, int64_t> remote_paths_to_size_;
 
     size_t added_total_file_size_ = 0;
+
+    // Whether DiskANN is legacy.
+    bool is_legacy_diskann_ = false;
+
+    // Whether DiskANN is memory or disk
+    bool use_diskann_memory_ = false;
+
+    // DiskANN load memory size
+    size_t diskann_load_memory_size_ = 0;
 };
 
 using DiskANNFileManagerImplPtr = std::shared_ptr<DiskFileManagerImpl>;

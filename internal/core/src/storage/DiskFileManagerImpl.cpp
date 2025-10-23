@@ -106,6 +106,11 @@ DiskFileManagerImpl::AddFileInternal(
     auto fileSize = local_chunk_manager->Size(file);
     added_total_file_size_ += fileSize;
 
+    // @Bytedance: accumulate DiskANN preload memory size based on original filename (unsliced)
+    if (!IsLegacyDiskann() && fileSize > 0) {
+        AccumulateDiskannLoadMemorySizeFromFilename(fileName, static_cast<size_t>(fileSize));
+    }
+
     std::vector<std::string> batch_remote_files;
     std::vector<int64_t> remote_file_sizes;
     std::vector<int64_t> local_file_offsets;
@@ -690,6 +695,45 @@ DiskFileManagerImpl::IsExisted(const std::string& file) noexcept {
         return std::nullopt;
     }
     return isExist;
+}
+
+void
+DiskFileManagerImpl::AccumulateDiskannLoadMemorySizeFromFilename(
+    const std::string& file_name, size_t file_size) {
+    auto has_substr = [](const std::string& s, const std::string& sub) -> bool {
+        return s.find(sub) != std::string::npos;
+    };
+
+    // Early return: exclude sampling files
+    if (file_name == "_sample_data.bin" || file_name == "_sample_ids.bin") {
+        return;
+    }
+
+    // Early return: exclude cached_nodes
+    if (file_name == "_cached_nodes.bin" || file_name == "_cached_nodes.data") {
+        return;
+    }
+
+    // Include essential index files based on memory mode
+    bool is_essential_file =
+        IsDiskannMemoryEnabled()
+            ? (file_name == "_mem.index" || file_name == "_mem.index.data")
+            : (file_name == "_disk.index");
+
+    // Include quantization-related files
+    bool is_quantization_file = has_substr(file_name, "rabitq") ||
+                                has_substr(file_name, "pq_compressed") ||
+                                has_substr(file_name, "pq_pivots") ||
+                                has_substr(file_name, "rotation_matrix") ||
+                                has_substr(file_name, "max_base_norm");
+
+    if (is_essential_file || is_quantization_file) {
+        LOG_INFO(
+            "Accumulate diskann load memory size: file_name={}, file_size={}",
+            file_name,
+            file_size);
+        diskann_load_memory_size_ += file_size;
+    }
 }
 
 template std::string

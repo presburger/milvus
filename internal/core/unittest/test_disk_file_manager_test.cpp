@@ -39,6 +39,7 @@
 #include "storage/Util.h"
 #include "storage/DiskFileManagerImpl.h"
 #include "storage/LocalChunkManagerSingleton.h"
+#include "index/VectorDiskIndex.h"
 
 #include "test_utils/storage_test_utils.h"
 
@@ -394,5 +395,288 @@ TEST_F(DiskAnnFileManagerTest, CacheOptFieldToDiskOnlyOneCategory) {
             file_manager, insert_file_path);
         auto res = file_manager->CacheOptFieldToDisk(opt_fileds);
         ASSERT_TRUE(res.empty());
+    }
+}
+
+
+TEST_F(DiskAnnFileManagerTest, TestDiskannLegacyFlags) {
+    // Arrange
+    auto file_manager = CreateFileManager(cm_);
+    
+    // Act & Assert - Test default values
+    EXPECT_TRUE(file_manager->IsLegacyDiskann());
+    EXPECT_FALSE(file_manager->IsDiskannMemoryEnabled());
+    EXPECT_EQ(file_manager->GetDiskannLoadMemorySize(), 0);
+    
+    // Act & Assert - Test setting diskann legacy flag
+    file_manager->SetIsLegacyDiskann(false);
+    EXPECT_FALSE(file_manager->IsLegacyDiskann());
+    
+    file_manager->SetIsLegacyDiskann(true);
+    EXPECT_TRUE(file_manager->IsLegacyDiskann());
+    
+    // Act & Assert - Test setting diskann memory flag
+    file_manager->SetUseDiskannMemory(true);
+    EXPECT_TRUE(file_manager->IsDiskannMemoryEnabled());
+    
+    file_manager->SetUseDiskannMemory(false);
+    EXPECT_FALSE(file_manager->IsDiskannMemoryEnabled());
+}
+
+TEST_F(DiskAnnFileManagerTest, TestAccumulateDiskannLoadMemorySize) {
+    // Arrange
+    auto file_manager = CreateFileManager(cm_);
+    file_manager->SetIsLegacyDiskann(false);
+    
+    struct TestCase {
+        std::string file_name;
+        size_t file_size;
+        bool use_diskann_memory;
+        bool should_include;
+        std::string description;
+    };
+    
+    std::vector<TestCase> test_cases = {
+        // Sampling files - should be excluded
+        {"_sample_data.bin", 1000, false, false, "sample data file"},
+        {"_sample_ids.bin", 2000, true, false, "sample ids file"},
+        
+        // Quantization files - should be included
+        {"_rabitq_data.bin", 3000, false, true, "rabitq file"},
+        {"_pq_compressed.bin", 4000, false, true, "pq compressed file"},
+        {"_pq_pivots.bin", 5000, false, true, "pq pivots file"},
+        {"_rotation_matrix.bin", 6000, false, true, "rotation matrix file"},
+        {"max_base_norm.bin", 7000, false, true, "max base norm file"},
+        
+        // Memory index files - included when use_diskann_memory=true
+        {"_mem.index", 8000, true, true, "memory index file with memory mode"},
+        {"_mem.index.data", 9000, true, true, "memory index data file with memory mode"},
+        {"_mem.index", 8000, false, false, "memory index file with disk mode"},
+        {"_mem.index.data", 9000, false, false, "memory index data file with disk mode"},
+        
+        // Disk index files - included when use_diskann_memory=false
+        {"_disk.index", 10000, false, true, "disk index file with disk mode"},
+        {"_disk.index", 10000, true, false, "disk index file with memory mode"},
+        
+        // Other files - should be excluded
+        {"other_file.bin", 11000, false, false, "other file"},
+        {"unknown.data", 12000, true, false, "unknown file"},
+    };
+    
+    for (const auto& test_case : test_cases) {
+        // Arrange
+        auto test_file_manager = CreateFileManager(cm_);
+        test_file_manager->SetIsLegacyDiskann(false);
+        test_file_manager->SetUseDiskannMemory(test_case.use_diskann_memory);
+        
+        size_t initial_size = test_file_manager->GetDiskannLoadMemorySize();
+        
+        // Act - Create a temporary file and add it
+        auto lcm = LocalChunkManagerSingleton::GetInstance().GetChunkManager();
+        std::string temp_file_path = "/tmp/diskann/test_files/" + test_case.file_name;
+        lcm->CreateFile(temp_file_path);
+        std::vector<uint8_t> data(test_case.file_size, 0x42);
+        lcm->Write(temp_file_path, data.data(), test_case.file_size);
+        
+        test_file_manager->AddFile(temp_file_path);
+        
+        // Assert
+        size_t expected_size = initial_size + (test_case.should_include ? test_case.file_size : 0);
+        EXPECT_EQ(test_file_manager->GetDiskannLoadMemorySize(), expected_size) 
+            << "Failed for test case: " << test_case.description 
+            << " (file: " << test_case.file_name << ", use_memory: " << test_case.use_diskann_memory << ")";
+        
+        // Cleanup
+        lcm->Remove(temp_file_path);
+    }
+}
+
+TEST_F(DiskAnnFileManagerTest, TestAccumulateWithZeroFileSize) {
+    // Arrange
+    auto file_manager = CreateFileManager(cm_);
+    file_manager->SetIsLegacyDiskann(false);
+    file_manager->SetUseDiskannMemory(false);
+    
+    auto lcm = LocalChunkManagerSingleton::GetInstance().GetChunkManager();
+    std::string temp_file_path = "/tmp/diskann/test_files/_disk.index";
+    
+    // Act - Create empty file
+    lcm->CreateFile(temp_file_path);
+    // Don't write any data, so file size is 0
+    
+    size_t initial_size = file_manager->GetDiskannLoadMemorySize();
+    file_manager->AddFile(temp_file_path);
+    
+    // Assert - Zero size files should not be accumulated
+    EXPECT_EQ(file_manager->GetDiskannLoadMemorySize(), initial_size);
+    
+    // Cleanup
+    lcm->Remove(temp_file_path);
+}
+
+TEST_F(DiskAnnFileManagerTest, TestNonLegacyMemorySizeCalculation) {
+    // Arrange
+    auto file_manager = CreateFileManager(cm_);
+    auto lcm = LocalChunkManagerSingleton::GetInstance().GetChunkManager();
+    
+    // Create test files with different sizes
+    std::vector<std::pair<std::string, size_t>> test_files = {
+        {"_disk.index", 50000},
+        {"rabitq_compressed.bin", 30000},
+        {"pq_pivots.bin", 20000},
+        {"_sample_data.bin", 10000}  // This should be excluded
+    };
+    
+    size_t expected_total = 0;
+    for (const auto& [file_name, file_size] : test_files) {
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        lcm->CreateFile(temp_file_path);
+        std::vector<uint8_t> data(file_size, 0x42);
+        lcm->Write(temp_file_path, data.data(), file_size);
+        
+        // Only include non-sample files in expected total
+        if (file_name != "_sample_data.bin") {
+            expected_total += file_size;
+        }
+    }
+    
+    // Test with legacy diskann disabled
+    file_manager->SetIsLegacyDiskann(false);
+    file_manager->SetUseDiskannMemory(false);  // Use disk mode
+    
+    // Act - Add all files
+    for (const auto& [file_name, file_size] : test_files) {
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        file_manager->AddFile(temp_file_path);
+    }
+    
+    // Assert
+    EXPECT_EQ(file_manager->GetDiskannLoadMemorySize(), expected_total);
+    EXPECT_GT(file_manager->GetAddedTotalFileSize(), file_manager->GetDiskannLoadMemorySize());
+    
+    // Cleanup
+    for (const auto& [file_name, file_size] : test_files) {
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        lcm->Remove(temp_file_path);
+    }
+}
+
+TEST_F(DiskAnnFileManagerTest, TestStoreStrategyParsing) {
+    // This test would ideally test the VectorDiskIndex Build method,
+    // but since we're focusing on DiskFileManagerImpl, we test the flag setting directly
+    
+    // Arrange
+    auto file_manager = CreateFileManager(cm_);
+    
+    // Test case 1: Memory store strategy
+    file_manager->SetUseDiskannMemory(true);
+    EXPECT_TRUE(file_manager->IsDiskannMemoryEnabled());
+    
+    // Test case 2: Non-memory store strategy
+    file_manager->SetUseDiskannMemory(false);
+    EXPECT_FALSE(file_manager->IsDiskannMemoryEnabled());
+}
+
+TEST_F(DiskAnnFileManagerTest, TestNonLegacyEndToEnd) {
+    auto file_manager = CreateFileManager(cm_);
+    auto lcm = LocalChunkManagerSingleton::GetInstance().GetChunkManager();
+    
+    // Step 1: Configure for legacy diskann
+    file_manager->SetIsLegacyDiskann(false);
+    file_manager->SetUseDiskannMemory(true);  // Use memory mode
+    
+    // Step 2: Add various types of files
+    std::vector<std::pair<std::string, size_t>> files = {
+        {"_mem.index", 100000},           // Should be included (memory mode)
+        {"_mem.index.data", 50000},       // Should be included (memory mode)
+        {"rabitq_compressed.bin", 30000}, // Should be included (quantization)
+        {"pq_pivots.bin", 20000},         // Should be included (quantization)
+        {"_sample_data.bin", 10000},      // Should be excluded (sampling)
+        {"_disk.index", 80000},           // Should be excluded (disk mode file in memory mode)
+    };
+    
+    size_t expected_non_legacy_size = 100000 + 50000 + 30000 + 20000; // Exclude sample and disk files
+    size_t expected_total_size = 0;
+    
+    for (const auto& [file_name, file_size] : files) {
+        expected_total_size += file_size;
+        
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        lcm->CreateFile(temp_file_path);
+        std::vector<uint8_t> data(file_size, 0x42);
+        lcm->Write(temp_file_path, data.data(), file_size);
+        
+        // Act
+        file_manager->AddFile(temp_file_path);
+    }
+    
+    // Assert
+    EXPECT_EQ(file_manager->GetDiskannLoadMemorySize(), expected_non_legacy_size);
+    EXPECT_EQ(file_manager->GetAddedTotalFileSize(), expected_total_size);
+    EXPECT_TRUE(file_manager->IsLegacyDiskann());
+    EXPECT_TRUE(file_manager->IsDiskannMemoryEnabled());
+    
+    EXPECT_NE(file_manager->GetDiskannLoadMemorySize(), file_manager->GetAddedTotalFileSize());
+    
+    // Cleanup
+    for (const auto& [file_name, file_size] : files) {
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        lcm->Remove(temp_file_path);
+    }
+}
+
+TEST_F(DiskAnnFileManagerTest, TestMemoryVsDiskModeFiltering) {
+    // Arrange
+    auto lcm = LocalChunkManagerSingleton::GetInstance().GetChunkManager();
+    
+    // Test files for both memory and disk modes
+    std::vector<std::pair<std::string, size_t>> test_files = {
+        {"_mem.index", 10000},
+        {"_mem.index.data", 5000},
+        {"_disk.index", 8000},
+    };
+    
+    // Create test files
+    for (const auto& [file_name, file_size] : test_files) {
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        lcm->CreateFile(temp_file_path);
+        std::vector<uint8_t> data(file_size, 0x42);
+        lcm->Write(temp_file_path, data.data(), file_size);
+    }
+    
+    // Test Case 1: Memory mode - should include memory files, exclude disk files
+    {
+        auto file_manager = CreateFileManager(cm_);
+        file_manager->SetIsLegacyDiskann(false);
+        file_manager->SetUseDiskannMemory(true);
+        
+        for (const auto& [file_name, file_size] : test_files) {
+            std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+            file_manager->AddFile(temp_file_path);
+        }
+        
+        size_t expected_memory_mode_size = 10000 + 5000; // Only memory files
+        EXPECT_EQ(file_manager->GetDiskannLoadMemorySize(), expected_memory_mode_size);
+    }
+    
+    // Test Case 2: Disk mode - should include disk files, exclude memory files
+    {
+        auto file_manager = CreateFileManager(cm_);
+        file_manager->SetIsLegacyDiskann(false);
+        file_manager->SetUseDiskannMemory(false);
+        
+        for (const auto& [file_name, file_size] : test_files) {
+            std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+            file_manager->AddFile(temp_file_path);
+        }
+        
+        size_t expected_disk_mode_size = 8000; // Only disk files
+        EXPECT_EQ(file_manager->GetDiskannLoadMemorySize(), expected_disk_mode_size);
+    }
+    
+    // Cleanup
+    for (const auto& [file_name, file_size] : test_files) {
+        std::string temp_file_path = "/tmp/diskann/test_files/" + file_name;
+        lcm->Remove(temp_file_path);
     }
 }

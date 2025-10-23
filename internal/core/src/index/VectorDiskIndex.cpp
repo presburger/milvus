@@ -124,6 +124,10 @@ VectorDiskAnnIndex<T>::Upload(const Config& config) {
                   "failed to serialize index, " + KnowhereStatusString(stat));
     }
     auto remote_paths_to_size = file_manager_->GetRemotePathsToFileSize();
+    if (!file_manager_->IsLegacyDiskann()) {
+        // Use GetDiskannLoadMemorySize() instead of GetAddedTotalFileSize() for non-legacy DiskANN
+        return IndexStats::NewFromSizeMap(file_manager_->GetDiskannLoadMemorySize(), remote_paths_to_size);
+    }
     return IndexStats::NewFromSizeMap(file_manager_->GetAddedTotalFileSize(),
                                       remote_paths_to_size);
 }
@@ -131,6 +135,22 @@ VectorDiskAnnIndex<T>::Upload(const Config& config) {
 template <typename T>
 void
 VectorDiskAnnIndex<T>::Build(const Config& config) {
+    // @bytedance begin
+    auto legacy_opt = GetValueFromConfig<bool>(config, "legacy");
+    bool is_legacy_diskann = legacy_opt.value_or(false);
+    // record is_legacy_diskann flag in file manager for downstream inspection
+    file_manager_->SetIsLegacyDiskann(is_legacy_diskann);
+    auto store_strategy_opt = GetValueFromConfig<std::string>(config, "store_strategy");
+    bool is_memory_store = false;
+    if (store_strategy_opt.has_value()) {
+        // Normalize to upper-case compare
+        string upper = store_strategy_opt.value();
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        is_memory_store = (upper == "MEMORY");
+    }
+    file_manager_->SetUseDiskannMemory(is_memory_store);
+    // @bytedance end
+
     auto local_chunk_manager =
         storage::LocalChunkManagerSingleton::GetInstance().GetChunkManager();
     knowhere::Json build_config;
