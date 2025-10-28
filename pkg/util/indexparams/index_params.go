@@ -46,6 +46,8 @@ const (
 	NumLoadThreadKey     = "num_load_thread"
 	BeamWidthKey         = "beamwidth"
 
+	LegacyDiskANNCompatibleKey = "legacy"
+
 	MaxLoadThread = 64
 	MaxBeamWidth  = 16
 )
@@ -171,7 +173,7 @@ func FillDiskIndexParams(params *paramtable.ComponentParam, indexParams map[stri
 	var pqCodeBudgetGBRatio string
 	var buildNumThreadsRatio string
 	var searchCacheBudgetGBRatio string
-
+	var legacyDiskANNEnable string
 	if params.AutoIndexConfig.Enable.GetAsBool() {
 		indexParams := params.AutoIndexConfig.IndexParams.GetAsJSONMap()
 		var ok bool
@@ -190,19 +192,30 @@ func FillDiskIndexParams(params *paramtable.ComponentParam, indexParams map[stri
 		pqCodeBudgetGBRatio = fmt.Sprintf("%f", extraParams.PQCodeBudgetGBRatio)
 		buildNumThreadsRatio = fmt.Sprintf("%f", extraParams.BuildNumThreadsRatio)
 		searchCacheBudgetGBRatio = fmt.Sprintf("%f", extraParams.SearchCacheBudgetGBRatio)
+		legacyDiskANNEnable = params.CommonCfg.LegacyDiskANNEnable.GetValue()
+
 	} else {
 		maxDegree = params.CommonCfg.MaxDegree.GetValue()
 		searchListSize = params.CommonCfg.SearchListSize.GetValue()
 		pqCodeBudgetGBRatio = params.CommonCfg.PQCodeBudgetGBRatio.GetValue()
 		buildNumThreadsRatio = params.CommonCfg.BuildNumThreadsRatio.GetValue()
 		searchCacheBudgetGBRatio = params.CommonCfg.SearchCacheBudgetGBRatio.GetValue()
+		legacyDiskANNEnable = params.CommonCfg.LegacyDiskANNEnable.GetValue()
+	}
+	defaults := map[string]string{
+		MaxDegreeKey:               maxDegree,
+		SearchListSizeKey:          searchListSize,
+		PQCodeBudgetRatioKey:       pqCodeBudgetGBRatio,
+		NumBuildThreadRatioKey:     buildNumThreadsRatio,
+		SearchCacheBudgetRatioKey:  searchCacheBudgetGBRatio,
+		LegacyDiskANNCompatibleKey: legacyDiskANNEnable,
 	}
 
-	indexParams[MaxDegreeKey] = maxDegree
-	indexParams[SearchListSizeKey] = searchListSize
-	indexParams[PQCodeBudgetRatioKey] = pqCodeBudgetGBRatio
-	indexParams[NumBuildThreadRatioKey] = buildNumThreadsRatio
-	indexParams[SearchCacheBudgetRatioKey] = searchCacheBudgetGBRatio
+	for k, v := range defaults {
+		if _, exist := indexParams[k]; !exist {
+			indexParams[k] = v
+		}
+	}
 
 	return nil
 }

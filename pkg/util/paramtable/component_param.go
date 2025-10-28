@@ -55,6 +55,7 @@ const (
 	DefaultSearchCacheBudgetGBRatio = 0.10
 	DefaultLoadNumThreadRatio       = 8.0
 	DefaultBeamWidthRatio           = 4.0
+
 )
 
 // ComponentParam is used to quickly and easily access all components' configurations.
@@ -227,6 +228,7 @@ type commonConfig struct {
 	LowPriorityThreadCoreCoefficient    ParamItem `refreshable:"false"`
 	EnableMaterializedView              ParamItem `refreshable:"false"`
 	BuildIndexThreadPoolRatio           ParamItem `refreshable:"false"`
+	LegacyDiskANNEnable                 ParamItem `refreshable:"true"`
 	MaxDegree                           ParamItem `refreshable:"true"`
 	SearchListSize                      ParamItem `refreshable:"true"`
 	PQCodeBudgetGBRatio                 ParamItem `refreshable:"true"`
@@ -529,6 +531,14 @@ This configuration is only used by querynode and indexnode, it selects CPU instr
 		DefaultValue: "true", // 2.5.4 version becomes default true
 	}
 	p.EnableMaterializedView.Init(base.mgr)
+
+	p.LegacyDiskANNEnable = ParamItem{
+		Key:          "common.DiskIndex.Legacy",
+		Version:      "2.5.7",
+		DefaultValue: "false",
+		Export:       true,
+	}
+	p.LegacyDiskANNEnable.Init(base.mgr)
 
 	p.MaxDegree = ParamItem{
 		Key:          "common.DiskIndex.MaxDegree",
