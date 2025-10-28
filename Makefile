@@ -18,6 +18,7 @@ MILVUS_GO_BUILD_TAGS := "dynamic,sonic"
 
 INSTALL_PATH := $(PWD)/bin
 LIBRARY_PATH := $(PWD)/lib
+PLUGIN_PATH := $(PWD)/plugins
 PGO_PATH := $(PWD)/configs/pgo
 OS := $(shell uname -s)
 mode = Release
@@ -81,7 +82,7 @@ ifeq (${ENABLE_AZURE}, false)
 	AZURE_OPTION := -Z
 endif
 
-milvus: build-cpp print-build-info build-go
+milvus: build-cpp print-build-info build-go build-go-plugin
 
 build-go:
 	@echo "Building Milvus ..."
@@ -89,6 +90,13 @@ build-go:
 		mkdir -p $(INSTALL_PATH) && go env -w CGO_ENABLED="1" && \
 		CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=on $(GO) build -pgo=$(PGO_PATH)/default.pgo -ldflags="-r $${RPATH} -X '$(OBJPREFIX).BuildTags=$(BUILD_TAGS)' -X '$(OBJPREFIX).BuildTime=$(BUILD_TIME)' -X '$(OBJPREFIX).GitCommit=$(GIT_COMMIT)' -X '$(OBJPREFIX).GoVersion=$(GO_VERSION)'" \
 		-tags $(MILVUS_GO_BUILD_TAGS) -o $(INSTALL_PATH)/milvus $(PWD)/cmd/main.go 1>/dev/null
+
+build-go-plugin:
+	@echo "Building Milvus go-plugin ..."
+	@source $(PWD)/scripts/setenv.sh && \
+		mkdir -p $(LIBRARY_PATH)/plugins && go env -w CGO_ENABLED="1" && \
+		CGO_LDFLAGS="$(CGO_LDFLAGS)" CGO_CFLAGS="$(CGO_CFLAGS)" GO111MODULE=on $(GO) build -pgo=$(PGO_PATH)/default.pgo -ldflags="-r $${RPATH} -X '$(OBJPREFIX).BuildTags=$(BUILD_TAGS)' -X '$(OBJPREFIX).BuildTime=$(BUILD_TIME)' -X '$(OBJPREFIX).GitCommit=$(GIT_COMMIT)' -X '$(OBJPREFIX).GoVersion=$(GO_VERSION)'" \
+		-tags $(MILVUS_GO_BUILD_TAGS) -buildmode=plugin -o  $(LIBRARY_PATH)/plugins/proxy_hook.so $(PLUGIN_PATH)/proxy_hook/proxy_hook.go 1>/dev/null
 
 milvus-gpu: build-cpp-gpu print-gpu-build-info
 	@echo "Building Milvus-gpu ..."

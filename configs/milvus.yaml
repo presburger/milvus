@@ -274,6 +274,7 @@ rootCoord:
 
 # Related configuration of proxy, used to validate client requests and reduce the returned results.
 proxy:
+  soPath: "/milvus/lib/plugins/proxy_hook.so"
   timeTickInterval: 200 # The interval at which proxy synchronizes the time tick, unit: ms.
   healthCheckTimeout: 3000 # ms, the interval that to do component healthy check
   msgStream:
@@ -911,6 +912,7 @@ common:
   enabledOptimizeExpr: true # Indicates whether to enable optimize expr
   enabledJSONKeyStats: false # Indicates sealedsegment whether to enable JSON key stats
   enabledGrowingSegmentJSONKeyStats: false # Indicates growingsegment whether to enable JSON key stats
+  panicWhenPluginFail: false # Whether to panic when load plugin fails.
 
 # QuotaConfig, configurations of Milvus quota and limits.
 # By default, we enable:

@@ -66,6 +66,7 @@ build_milvus() {
   make build-cpp
   make print-build-info
   make build-go
+  make build-go-plugin
 
   mkdir -p ./output/milvus/configs
   cp -rf ./configs/* ./output/milvus/configs/
@@ -80,6 +81,7 @@ build_milvus() {
 
   mkdir -p ./output/milvus/bin
   cp ./bin/milvus ./output/milvus/bin/milvus
+  cp -rf ./lib/* ./output/milvus/lib/ ||true
 }
 
 restore_cache() {

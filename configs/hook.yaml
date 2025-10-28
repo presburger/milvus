@@ -1,0 +1,5 @@
+# Hook plugin configuration for Milvus Proxy
+# This file provides key-value pairs passed into hook.Init(params)
+
+# initialUsers: comma-separated usernames that are protected from deletion. Example: "dev,admin"
+initialUsers: "root"
