@@ -62,12 +62,7 @@ export jobs=${CUSTOM_PARALLEL_LEVEL}
 #conan profile new default --detect --force
 #conan profile update conf.tools.build:jobs=${CUSTOM_PARALLEL_LEVEL} default
 
-build_milvus() {
-  make build-cpp
-  make print-build-info
-  make build-go
-  make build-go-plugin
-
+package_final_output() {
   mkdir -p ./output/milvus/configs
   cp -rf ./configs/* ./output/milvus/configs/
 
@@ -82,6 +77,22 @@ build_milvus() {
   mkdir -p ./output/milvus/bin
   cp ./bin/milvus ./output/milvus/bin/milvus
   cp -rf ./lib/* ./output/milvus/lib/ ||true
+}
+
+build_milvus() {
+  make build-cpp
+  make print-build-info
+  make build-go
+  make build-go-plugin
+
+  package_final_output
+}
+
+build_milvus_gpu() {
+  make milvus-gpu
+  make build-go-plugin
+  
+  package_final_output
 }
 
 restore_cache() {
@@ -111,15 +122,38 @@ build_cpp() {
   cp -rf /ccache/ ./output/
 }
 
+build_cpp_gpu() {
+  make build-cpp-gpu
+
+  mkdir -p ./output/home/milvus
+  cp -rf /home/milvus/.conan ./output/home/milvus/
+  cp -rf /ccache/ ./output/
+}
+
 CUSTOM_BUILD_ACTION=${CUSTOM_BUILD_ACTION:-"milvus"}
 echo "CUSTOM_BUILD_ACTION: ${CUSTOM_BUILD_ACTION}"
-if [ -n "$CUSTOM_BUILD_ACTION" ] && [ "$CUSTOM_BUILD_ACTION" = "milvus" ]; then
-    echo "build milvus"
-    restore_cache
-    build_milvus
-    echo "build ok"
+if [ -n "$CUSTOM_BUILD_ACTION" ]; then
+    if [ "$CUSTOM_BUILD_ACTION" = "milvus" ]; then
+        echo "build milvus"
+        restore_cache
+        build_milvus
+        echo "build milvus cpu ok"
+    elif [ "$CUSTOM_BUILD_ACTION" = "milvus-gpu" ]; then
+        echo "build milvus gpu"
+        restore_cache
+        build_milvus_gpu
+        echo "build milvus gpu ok"
+    elif [ "$CUSTOM_BUILD_ACTION" = "build-cpp" ]; then
+        echo "build cpp"
+        build_cpp $CUSTOM_BUILD_ACTION
+        echo "build cpp ok"
+    elif [ "$CUSTOM_BUILD_ACTION" = "build-cpp-gpu" ]; then
+        echo "build cpp gpu"
+        build_cpp_gpu
+        echo "build cpp gpu ok"
+    else
+        echo "Unknown build action: $CUSTOM_BUILD_ACTION"
+    fi
 else
-    echo "build cpp"
-    build_cpp $CUSTOM_BUILD_ACTION
-    echo "build ok"
+    echo "No build action specified."
 fi
