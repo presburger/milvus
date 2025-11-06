@@ -61,6 +61,8 @@ export jobs=${CUSTOM_PARALLEL_LEVEL}
 #export CONAN_CPU_COUNT=${CUSTOM_PARALLEL_LEVEL}
 #conan profile new default --detect --force
 #conan profile update conf.tools.build:jobs=${CUSTOM_PARALLEL_LEVEL} default
+CUSTOM_USE_DISK_INDEX=${CUSTOM_USE_DISK_INDEX:-"off"}
+echo "CUSTOM_USE_DISK_INDEX: ${CUSTOM_USE_DISK_INDEX}"
 
 package_final_output() {
   mkdir -p ./output/milvus/configs
@@ -80,17 +82,17 @@ package_final_output() {
 }
 
 build_milvus() {
-  make build-cpp
-  make print-build-info
-  make build-go
-  make build-go-plugin
+  make build-cpp use_disk_index=${CUSTOM_USE_DISK_INDEX}
+  make print-build-info use_disk_index=${CUSTOM_USE_DISK_INDEX}
+  make build-go use_disk_index=${CUSTOM_USE_DISK_INDEX}
+  make build-go-plugin use_disk_index=${CUSTOM_USE_DISK_INDEX}
 
   package_final_output
 }
 
 build_milvus_gpu() {
-  make milvus-gpu
-  make build-go-plugin
+  make milvus-gpu use_disk_index=${CUSTOM_USE_DISK_INDEX}
+  make build-go-plugin use_disk_index=${CUSTOM_USE_DISK_INDEX}
   
   package_final_output
 }
@@ -114,8 +116,8 @@ restore_cache() {
 }
 
 build_cpp() {
-  echo "make $1"
-  make $1
+  echo "make $1 use_disk_index=${CUSTOM_USE_DISK_INDEX}"
+  make $1 use_disk_index=${CUSTOM_USE_DISK_INDEX}
 
   mkdir -p ./output/home/milvus
   cp -rf /home/milvus/.conan ./output/home/milvus/
@@ -123,7 +125,7 @@ build_cpp() {
 }
 
 build_cpp_gpu() {
-  make build-cpp-gpu
+  make build-cpp-gpu use_disk_index=${CUSTOM_USE_DISK_INDEX}
 
   mkdir -p ./output/home/milvus
   cp -rf /home/milvus/.conan ./output/home/milvus/

@@ -396,4 +396,13 @@ CheckAndUpdateKnowhereRangeSearchParam(const SearchInfo& search_info,
     return true;
 }
 
+void
+SetLegacyIfNotExisted(knowhere::Json& config) {
+    auto legacy = GetValueFromConfig<bool>(config, DISK_ANN_LEGACY);
+    if (!legacy.has_value()) {
+        // old version diskann
+        config[DISK_ANN_LEGACY] = true;
+    }
+}
+
 }  // namespace milvus::index

@@ -20,7 +20,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
     rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget curl ca-certificates libaio-dev libgomp1 libopenblas-dev && \
+    apt-get install -y --no-install-recommends wget curl ca-certificates libaio-dev libgomp1 libopenblas-dev liblapacke-dev binutils && \
     apt-get install -y bison && \
     apt-get remove --purge -y && \
     rm -rf /var/lib/apt/lists/* 
@@ -32,12 +32,21 @@ RUN rm -rf /var/lib/apt/lists/*
 RUN curl -L -o /tini https://github.com/krallin/tini/releases/download/v0.19.0/tini-$TARGETARCH && \
     chmod +x /tini
 
-RUN mkdir -p /milvus/
+# 配置 jemalloc
+ARG JEMALLOC_URL=https://tosv.byted.org/obj/bytees-internal/luyuncheng/jemalloc_sys-5.2.1.bm.2.tar.gz
+ARG JEMALLOC_TOOL_URL=https://tosv.byted.org/obj/jemalloc-tools/jetools
+RUN mkdir -p /milvus/lib && \
+cd /milvus/lib/ && \
+wget -c $JEMALLOC_URL -O - | tar -xz
+RUN cd /milvus/lib/ && \
+wget -nv $JEMALLOC_TOOL_URL
+RUN chmod +x /milvus/lib/jetools
 
+# 环境变量
 ENV PATH=/milvus/bin:$PATH
 ENV LD_LIBRARY_PATH=/milvus/lib:$LD_LIBRARY_PATH:/usr/lib
-ENV LD_PRELOAD=${MILVUS_ASAN_LIB}:/milvus/lib/libjemalloc.so
-ENV MALLOC_CONF=background_thread:true
+ENV LD_PRELOAD=${MILVUS_ASAN_LIB}:/milvus/lib/jemalloc_sys-5.2.1.bm.2/lib/libjemalloc.so
+ENV MALLOC_CONF=background_thread:true,dirty_decay_ms:0,muzzy_decay_ms:0
 
 RUN echo LD_LIBRARY_PATH
 

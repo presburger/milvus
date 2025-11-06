@@ -165,4 +165,9 @@ CheckAndUpdateKnowhereRangeSearchParam(const SearchInfo& search_info,
                                        const MetricType& metric_type,
                                        knowhere::Json& search_config);
 
+// for old version diskann, there is not DISK_ANN_LEGACY in config
+// so we set it to true by default
+void
+SetLegacyIfNotExisted(knowhere::Json& config);
+
 }  // namespace milvus::index

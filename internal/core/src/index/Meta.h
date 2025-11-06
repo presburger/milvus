@@ -88,6 +88,9 @@ constexpr const char* DISK_ANN_LOAD_THREAD_NUM = "num_load_thread";
 constexpr const char* DISK_ANN_SEARCH_CACHE_BUDGET = "search_cache_budget_gb";
 constexpr const char* DISK_ANN_PREPARE_WARM_UP = "warm_up";
 constexpr const char* DISK_ANN_PREPARE_USE_BFS_CACHE = "use_bfs_cache";
+// legacy = true means use old version diskann, default value is false
+constexpr const char* DISK_ANN_LEGACY = "legacy";
+constexpr const char* DISK_ANN_STORE_STRATEGY = "store_strategy";
 
 // DiskAnn query params
 constexpr const char* DISK_ANN_QUERY_LIST = "search_list";

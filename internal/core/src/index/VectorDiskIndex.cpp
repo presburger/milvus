@@ -85,6 +85,7 @@ void
 VectorDiskAnnIndex<T>::Load(milvus::tracer::TraceContext ctx,
                             const Config& config) {
     knowhere::Json load_config = update_load_json(config);
+    LOG_DEBUG("load with config: {}", load_config.dump());
 
     // start read file span with active scope
     {
@@ -135,22 +136,6 @@ VectorDiskAnnIndex<T>::Upload(const Config& config) {
 template <typename T>
 void
 VectorDiskAnnIndex<T>::Build(const Config& config) {
-    // @bytedance begin
-    auto legacy_opt = GetValueFromConfig<bool>(config, "legacy");
-    bool is_legacy_diskann = legacy_opt.value_or(false);
-    // record is_legacy_diskann flag in file manager for downstream inspection
-    file_manager_->SetIsLegacyDiskann(is_legacy_diskann);
-    auto store_strategy_opt = GetValueFromConfig<std::string>(config, "store_strategy");
-    bool is_memory_store = false;
-    if (store_strategy_opt.has_value()) {
-        // Normalize to upper-case compare
-        string upper = store_strategy_opt.value();
-        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-        is_memory_store = (upper == "MEMORY");
-    }
-    file_manager_->SetUseDiskannMemory(is_memory_store);
-    // @bytedance end
-
     auto local_chunk_manager =
         storage::LocalChunkManagerSingleton::GetInstance().GetChunkManager();
     knowhere::Json build_config;
@@ -168,6 +153,7 @@ VectorDiskAnnIndex<T>::Build(const Config& config) {
     auto local_index_path_prefix = file_manager_->GetLocalIndexObjectPrefix();
     build_config[DISK_ANN_PREFIX_PATH] = local_index_path_prefix;
 
+    // adjust params
     if (GetIndexType() == knowhere::IndexEnum::INDEX_DISKANN) {
         auto num_threads = GetValueFromConfig<std::string>(
             build_config, DISK_ANN_BUILD_THREAD_NUM);
@@ -176,7 +162,24 @@ VectorDiskAnnIndex<T>::Build(const Config& config) {
             "param " + std::string(DISK_ANN_BUILD_THREAD_NUM) + "is empty");
         build_config[DISK_ANN_THREADS_NUM] =
             std::atoi(num_threads.value().c_str());
+        SetLegacyIfNotExisted(build_config);
     }
+
+    // @bytedance begin
+    auto legacy_opt = GetValueFromConfig<bool>(config, DISK_ANN_LEGACY);
+    bool is_legacy_diskann = legacy_opt.value_or(false);
+    // record is_legacy_diskann flag in file manager for downstream inspection
+    file_manager_->SetIsLegacyDiskann(is_legacy_diskann);
+    auto store_strategy_opt = GetValueFromConfig<std::string>(config, DISK_ANN_STORE_STRATEGY);
+    bool is_memory_store = is_legacy_diskann ? false : true;
+    if (store_strategy_opt.has_value()) {
+        // Normalize to upper-case compare
+        string upper = store_strategy_opt.value();
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        is_memory_store = (upper == "MEMORY");
+    }
+    file_manager_->SetUseDiskannMemory(is_memory_store);
+    // @bytedance end
 
     auto opt_fields = GetValueFromConfig<OptFieldT>(config, VEC_OPT_FIELDS);
     auto is_partition_key_isolation =
@@ -228,6 +231,7 @@ VectorDiskAnnIndex<T>::BuildWithDataset(const DatasetPtr& dataset,
             "param " + std::string(DISK_ANN_BUILD_THREAD_NUM) + "is empty");
         build_config[DISK_ANN_THREADS_NUM] =
             std::atoi(num_threads.value().c_str());
+        SetLegacyIfNotExisted(build_config);
     }
     if (!local_chunk_manager->Exist(local_data_path)) {
         local_chunk_manager->CreateFile(local_data_path);
@@ -422,6 +426,8 @@ VectorDiskAnnIndex<T>::update_load_json(const Config& config) {
         load_config.erase(MMAP_FILE_PATH);
         load_config[ENABLE_MMAP] = true;
     }
+
+    SetLegacyIfNotExisted(load_config);
 
     return load_config;
 }

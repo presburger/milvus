@@ -10,6 +10,7 @@
 **/cmake_build_release/*
 **/cmake_build/*
 **/CmakeFiles/*
+**/CMakeFiles/*
 .cache
 coverage_report/
 
@@ -106,3 +107,6 @@ internal/core/src/pb/*.pb.h
 internal/core/src/pb/*.pb.cc
 **/legacypb/*.pb.go
 pkg/streaming/proto/**/*.pb.go
+.ccls-cache
+output/*
+CMakeCache.txt

@@ -129,6 +129,10 @@ IndexFactory::VecIndexLoadResource(
         mmaped = true;
     }
 
+    if (index_type == knowhere::IndexEnum::INDEX_DISKANN) {
+        SetLegacyIfNotExisted(config);
+    }
+
     knowhere::expected<knowhere::Resource> resource;
     float index_size_gb = index_size * 1.0 / 1024.0 / 1024.0 / 1024.0;
     float download_buffer_size_gb =
