@@ -110,3 +110,4 @@ pkg/streaming/proto/**/*.pb.go
 .ccls-cache
 output/*
 CMakeCache.txt
+.ccls-cache/

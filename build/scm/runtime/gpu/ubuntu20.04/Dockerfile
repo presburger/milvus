@@ -20,7 +20,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone &
     rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wget curl ca-certificates libaio-dev libgomp1 libopenblas-dev && \
+    apt-get install -y --no-install-recommends wget curl ca-certificates libaio-dev libgomp1 libopenblas-dev liblapacke-dev && \
     apt-get install -y bison && \
     apt-get remove --purge -y && \
     rm -rf /var/lib/apt/lists/* 

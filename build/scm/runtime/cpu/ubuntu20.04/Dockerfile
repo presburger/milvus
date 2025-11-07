@@ -20,7 +20,7 @@ RUN apt-get update && \
     echo $TZ > /etc/timezone
 
 
-RUN apt-get install -y --no-install-recommends curl wget ca-certificates libaio-dev libgomp1 libopenblas-dev systemd && \
+RUN apt-get install -y --no-install-recommends curl wget ca-certificates libaio-dev libgomp1 libopenblas-dev systemd liblapacke-dev && \
     apt-get remove --purge -y && \
     rm -rf /var/lib/apt/lists/*
 
