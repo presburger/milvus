@@ -30,6 +30,7 @@ import (
 	"github.com/milvus-io/milvus/internal/storage/aliyun"
 	"github.com/milvus-io/milvus/internal/storage/gcp"
 	"github.com/milvus-io/milvus/internal/storage/tencent"
+	"github.com/milvus-io/milvus/internal/storage/volcengine"
 	"github.com/milvus-io/milvus/pkg/v2/log"
 	"github.com/milvus-io/milvus/pkg/v2/util/paramtable"
 	"github.com/milvus-io/milvus/pkg/v2/util/retry"
@@ -70,6 +71,12 @@ func newMinioClient(ctx context.Context, c *config) (*minio.Client, error) {
 	case CloudProviderTencent:
 		bucketLookupType = minio.BucketLookupDNS
 		newMinioFn = tencent.NewMinioClient
+		if !c.useIAM {
+			creds = credentials.NewStaticV4(c.accessKeyID, c.secretAccessKeyID, "")
+		}
+	case CloudProviderVolcengine:
+		bucketLookupType = minio.BucketLookupDNS
+		newMinioFn = volcengine.NewMinioClient
 		if !c.useIAM {
 			creds = credentials.NewStaticV4(c.accessKeyID, c.secretAccessKeyID, "")
 		}

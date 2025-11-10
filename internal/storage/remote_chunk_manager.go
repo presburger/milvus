@@ -40,12 +40,13 @@ import (
 )
 
 const (
-	CloudProviderGCP       = "gcp"
-	CloudProviderGCPNative = "gcpnative"
-	CloudProviderAWS       = "aws"
-	CloudProviderAliyun    = "aliyun"
-	CloudProviderAzure     = "azure"
-	CloudProviderTencent   = "tencent"
+	CloudProviderGCP        = "gcp"
+	CloudProviderGCPNative  = "gcpnative"
+	CloudProviderAWS        = "aws"
+	CloudProviderAliyun     = "aliyun"
+	CloudProviderAzure      = "azure"
+	CloudProviderTencent    = "tencent"
+	CloudProviderVolcengine = "volcengine"
 )
 
 // ChunkObjectWalkFunc is the callback function for walking objects.

@@ -83,6 +83,10 @@ const std::unique_ptr<PrometheusClient> prometheusClient =
  *   text format parsing error in line 50: expected float as value, got "=\"0.9\"}"
  ******************************************************************************/
 
+std::map<std::string, std::string> sucMap = {
+    {"status", "success"}};
+std::map<std::string, std::string> failMap = {
+    {"status", "fail"}};
 std::map<std::string, std::string> getMap = {
     {"persistent_data_op_type", "get"}};
 std::map<std::string, std::string> getSucMap = {
@@ -172,6 +176,14 @@ DEFINE_PROMETHEUS_COUNTER(internal_storage_op_count_remove_suc,
 DEFINE_PROMETHEUS_COUNTER(internal_storage_op_count_remove_fail,
                           internal_storage_op_count,
                           removeFailMap)
+DEFINE_PROMETHEUS_COUNTER_FAMILY(internal_storage_sts_assume_count,
+                                 "[cpp]count of sts assume operation")
+DEFINE_PROMETHEUS_COUNTER(internal_storage_sts_assume_count_suc,
+                          internal_storage_sts_assume_count,
+                          sucMap)
+DEFINE_PROMETHEUS_COUNTER(internal_storage_sts_assume_count_fail,
+                          internal_storage_sts_assume_count,
+                          failMap)                          
 
 //load metrics
 std::map<std::string, std::string> downloadDurationLabels{{"type", "download"}};

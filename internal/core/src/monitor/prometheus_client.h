@@ -120,6 +120,10 @@ DECLARE_PROMETHEUS_HISTOGRAM(internal_storage_download_duration);
 DECLARE_PROMETHEUS_HISTOGRAM(internal_storage_write_disk_duration);
 DECLARE_PROMETHEUS_HISTOGRAM(internal_storage_deserialize_duration);
 
+DECLARE_PROMETHEUS_COUNTER_FAMILY(internal_storage_sts_assume_count);
+DECLARE_PROMETHEUS_COUNTER(internal_storage_sts_assume_count_suc);
+DECLARE_PROMETHEUS_COUNTER(internal_storage_sts_assume_count_fail);
+
 // mmap metrics
 DECLARE_PROMETHEUS_HISTOGRAM_FAMILY(internal_mmap_allocated_space_bytes);
 DECLARE_PROMETHEUS_HISTOGRAM(internal_mmap_allocated_space_bytes_anon);

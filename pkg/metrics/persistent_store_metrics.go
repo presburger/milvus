@@ -54,6 +54,14 @@ var (
 			Name:      "op_count",
 			Help:      "count of persistent data operation",
 		}, []string{persistentDataOpType, statusLabelName})
+
+	PersistentDataSTSAssumeCounter = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: milvusNamespace,
+			Subsystem: "storage",
+			Name:      "sts_assume_count",
+			Help:      "count of persistent data sts assume operation",
+		}, []string{statusLabelName})
 )
 
 // RegisterStorageMetrics registers storage metrics
@@ -61,4 +69,5 @@ func RegisterStorageMetrics(registry *prometheus.Registry) {
 	registry.MustRegister(PersistentDataKvSize)
 	registry.MustRegister(PersistentDataRequestLatency)
 	registry.MustRegister(PersistentDataOpCounter)
+	registry.MustRegister(PersistentDataSTSAssumeCounter)
 }

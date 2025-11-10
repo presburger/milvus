@@ -27,6 +27,9 @@
 #include "pb/schema.pb.h"
 #include "query/Utils.h"
 #include "test_utils/DataGen.h"
+#include "storage/VolcengineSTSClient.h"
+#include <aws/core/client/SpecifiedRetryableErrorsRetryStrategy.h>
+#include <aws/core/Aws.h>
 
 TEST(Util, StringMatch) {
     using namespace milvus;
@@ -204,4 +207,34 @@ TEST(Util, ProtoLayout) {
     milvus::ProtoLayout layout;
     milvus::proto::cgo::IndexStats result;
     EXPECT_TRUE(layout.SerializeAndHoldProto(result));
+}
+
+TEST(Util, VolcSTSCredentialsClient) {
+    // ENV: VOLCENGINE_OIDC_STS_ENDPOINT=sts.cn-beijing.volcengine-api.com
+    // refer to https://docs.aws.amazon.com/zh_cn/code-library/latest/ug/cpp_1_s3_code_examples.html
+    auto OIDCToken = "fake";
+    auto TRN = "trn:iam::2100211764:role/MilvusTos";
+    Aws::SDKOptions options;
+    Aws::InitAPI(options);
+    static Aws::Client::ClientConfiguration config;
+    config.scheme = Aws::Http::Scheme::HTTPS;
+    Aws::Vector<Aws::String> retryableErrors;
+    retryableErrors.push_back("IDPCommunicationError");
+    retryableErrors.push_back("InvalidIdentityToken");
+    config.retryStrategy =
+        Aws::MakeShared<Aws::Client::SpecifiedRetryableErrorsRetryStrategy>(
+            "VolcengineSTSCredentialsClient",
+            retryableErrors,
+            3 /*maxRetries*/);
+    Aws::UniquePtr<Aws::Internal::VolcengineSTSCredentialsClient> m_client;
+    m_client = Aws::MakeUnique<Aws::Internal::VolcengineSTSCredentialsClient>(
+        "VolcengineSTSCredentialsClient", config);
+    Aws::Internal::VolcengineSTSCredentialsClient::
+    STSAssumeRoleWithWebIdentityRequest request{
+        OIDCToken, TRN, "test"};
+    auto result = m_client->GetAssumeRoleWithWebIdentityCredentials(request);
+    std::cout << "ak = " << result.creds.GetAWSAccessKeyId() << std::endl;
+    std::cout << "sk = " << result.creds.GetAWSSecretKey() << std::endl;
+    std::cout << "token = " << result.creds.GetSessionToken() << std::endl;
+    std::cout << "expiration = " << result.creds.GetExpiration().ToGmtString(Aws::Utils::DateFormat::ISO_8601) << std::endl;
 }

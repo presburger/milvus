@@ -74,6 +74,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.24.10
 	github.com/tidwall/gjson v1.17.1
 	github.com/valyala/fastjson v1.6.4
+	github.com/volcengine/volcengine-go-sdk v1.1.42
 	github.com/zeebo/xxh3 v1.0.2
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0
 	google.golang.org/api v0.187.0
@@ -225,6 +226,7 @@ require (
 	github.com/twmb/murmur3 v1.1.3 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
+	github.com/volcengine/volc-sdk-golang v1.0.23 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
