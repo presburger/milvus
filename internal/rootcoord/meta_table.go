@@ -478,8 +478,8 @@ func (mt *MetaTable) ChangeCollectionState(ctx context.Context, collectionID Uni
 		metrics.RootCoordNumOfCollections.WithLabelValues(db.Name).Dec()
 		metrics.RootCoordNumOfPartitions.WithLabelValues().Sub(float64(pn))
 		// clean collection entities metrics
-		metrics.RootCoordNumEntities.DeleteLabelValues(coll.Name, metrics.TotalLabel)
-		metrics.RootCoordNumEntities.DeleteLabelValues(coll.Name, metrics.LoadedLabel)
+		metrics.RootCoordNumEntities.DeleteLabelValues(coll.DBName, coll.Name, metrics.TotalLabel)
+		metrics.RootCoordNumEntities.DeleteLabelValues(coll.DBName, coll.Name, metrics.LoadedLabel)
 	}
 
 	log.Ctx(ctx).Info("change collection state", zap.Int64("collection", collectionID),

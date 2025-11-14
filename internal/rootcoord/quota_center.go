@@ -387,6 +387,8 @@ func (q *QuotaCenter) collectMetrics() error {
 	ctx, cancel := context.WithTimeout(q.ctx, GetMetricsTimeout)
 	defer cancel()
 
+	metrics.RootCoordNumEntities.Reset()
+	metrics.RootCoordIndexedNumEntities.Reset()
 	group := &errgroup.Group{}
 
 	// get Query cluster metrics
@@ -427,7 +429,7 @@ func (q *QuotaCenter) collectMetrics() error {
 			q.collectionIDToDBID.Insert(collectionID, coll.DBID)
 			q.collections.Insert(FormatCollectionKey(coll.DBID, coll.Name), collectionID)
 			if numEntity, ok := numEntitiesLoaded[collectionID]; ok {
-				metrics.RootCoordNumEntities.WithLabelValues(coll.Name, metrics.LoadedLabel).Set(float64(numEntity))
+				metrics.RootCoordNumEntities.WithLabelValues(coll.DBName, coll.Name, metrics.LoadedLabel).Set(float64(numEntity))
 			}
 			return true
 		})
@@ -487,7 +489,7 @@ func (q *QuotaCenter) collectMetrics() error {
 				return true
 			}
 			if datacoordCollectionMetric, ok := collectionMetrics[collectionID]; ok {
-				metrics.RootCoordNumEntities.WithLabelValues(coll.Name, metrics.TotalLabel).Set(float64(datacoordCollectionMetric.NumEntitiesTotal))
+				metrics.RootCoordNumEntities.WithLabelValues(coll.DBName, coll.Name, metrics.TotalLabel).Set(float64(datacoordCollectionMetric.NumEntitiesTotal))
 				fields := lo.KeyBy(coll.Fields, func(v *model.Field) int64 { return v.FieldID })
 				for _, indexInfo := range datacoordCollectionMetric.IndexInfo {
 					if _, ok := fields[indexInfo.FieldID]; !ok {
@@ -495,6 +497,7 @@ func (q *QuotaCenter) collectMetrics() error {
 					}
 					field := fields[indexInfo.FieldID]
 					metrics.RootCoordIndexedNumEntities.WithLabelValues(
+						coll.DBName,
 						coll.Name,
 						indexInfo.IndexName,
 						strconv.FormatBool(typeutil.IsVectorType(field.DataType))).Set(float64(indexInfo.NumEntitiesIndexed))
