@@ -19,6 +19,7 @@ package grpcindexnodeclient
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -81,7 +82,16 @@ func NewClient(ctx context.Context, addr string, nodeID int64, encryption bool) 
 			return nil, err
 		}
 		client.grpcClient.SetInternalTLSCertPool(cp)
-		client.grpcClient.SetInternalTLSServerName(Params.InternalTLSCfg.InternalTLSSNI.GetValue())
+		if Params.DataCoordCfg.BindIndexNodeMode.GetAsBool() {
+			host, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				log.Ctx(ctx).Error("Failed to split host for IndexNode client")
+				return nil, err
+			}
+			client.grpcClient.SetInternalTLSServerName(host)
+		} else {
+			client.grpcClient.SetInternalTLSServerName(Params.InternalTLSCfg.InternalTLSSNI.GetValue())
+		}
 	}
 	return client, nil
 }
