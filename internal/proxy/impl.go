@@ -2712,6 +2712,9 @@ func (node *Proxy) Insert(ctx context.Context, request *milvuspb.InsertRequest) 
 	if merr.Ok(it.result.GetStatus()) {
 		metrics.ProxyReportValue.WithLabelValues(nodeID, hookutil.OpTypeInsert, request.DbName, username).Add(float64(v))
 	}
+	metrics.ProxyRequestDataSize.
+		WithLabelValues(nodeID, hookutil.OpTypeInsert, dbName, collectionName).
+		Add(float64(proto.Size(request)))
 	metrics.ProxyInsertVectors.
 		WithLabelValues(nodeID, dbName, collectionName).
 		Add(float64(successCnt))
@@ -2816,6 +2819,9 @@ func (node *Proxy) Delete(ctx context.Context, request *milvuspb.DeleteRequest) 
 	if merr.Ok(dr.result.GetStatus()) {
 		metrics.ProxyReportValue.WithLabelValues(nodeID, hookutil.OpTypeDelete, dbName, username).Add(float64(v))
 	}
+	metrics.ProxyRelatedCnt.
+		WithLabelValues(nodeID, metrics.DeleteLabel, dbName, collectionName).
+		Add(float64(dr.allQueryCnt.Load()))
 	metrics.ProxyFunctionCall.WithLabelValues(nodeID, method,
 		metrics.SuccessLabel, dbName, collectionName).Inc()
 	metrics.ProxyMutationLatency.
@@ -2966,6 +2972,9 @@ func (node *Proxy) Upsert(ctx context.Context, request *milvuspb.UpsertRequest) 
 	metrics.ProxyFunctionCall.WithLabelValues(nodeID, method,
 		metrics.SuccessLabel, dbName, collectionName).Inc()
 	successCnt := it.result.UpsertCnt - int64(len(it.result.ErrIndex))
+	metrics.ProxyRequestDataSize.
+		WithLabelValues(nodeID, metrics.UpsertLabel, dbName, collectionName).
+		Add(float64(proto.Size(it.req)))
 	metrics.ProxyUpsertVectors.
 		WithLabelValues(nodeID, dbName, collectionName).
 		Add(float64(successCnt))
@@ -3247,6 +3256,9 @@ func (node *Proxy) search(ctx context.Context, request *milvuspb.SearchRequest, 
 		SetReportValue(qt.result.GetStatus(), v)
 		if merr.Ok(qt.result.GetStatus()) {
 			metrics.ProxyReportValue.WithLabelValues(nodeID, hookutil.OpTypeSearch, dbName, username).Add(float64(v))
+			metrics.ProxyRelatedCnt.WithLabelValues(nodeID, metrics.SearchLabel, dbName, collectionName).Add(float64(qt.result.GetResults().GetAllSearchCount()))
+			metrics.ProxyResultDataSize.WithLabelValues(nodeID, metrics.SearchLabel, dbName, collectionName).Add(float64(sentSize))
+			metrics.ProxyRelatedDataSize.WithLabelValues(nodeID, metrics.SearchLabel, dbName, collectionName).Add(float64(qt.relatedDataSize))
 		}
 	}
 	return qt.result, qt.resultSizeInsufficient, qt.isTopkReduce, qt.isRecallEvaluation, nil
@@ -3481,6 +3493,9 @@ func (node *Proxy) hybridSearch(ctx context.Context, request *milvuspb.HybridSea
 		SetReportValue(qt.result.GetStatus(), v)
 		if merr.Ok(qt.result.GetStatus()) {
 			metrics.ProxyReportValue.WithLabelValues(nodeID, hookutil.OpTypeHybridSearch, dbName, username).Add(float64(v))
+			metrics.ProxyRelatedCnt.WithLabelValues(nodeID, metrics.HybridSearchLabel, dbName, collectionName).Add(float64(qt.result.GetResults().GetAllSearchCount()))
+			metrics.ProxyRelatedDataSize.WithLabelValues(nodeID, metrics.HybridSearchLabel, dbName, collectionName).Add(float64(qt.relatedDataSize))
+			metrics.ProxyResultDataSize.WithLabelValues(nodeID, metrics.HybridSearchLabel, dbName, collectionName).Add(float64(sentSize))
 		}
 	}
 	return qt.result, qt.resultSizeInsufficient, qt.isTopkReduce, nil
@@ -3818,6 +3833,9 @@ func (node *Proxy) Query(ctx context.Context, request *milvuspb.QueryRequest) (*
 	})
 	SetReportValue(res.Status, v)
 	metrics.ProxyReportValue.WithLabelValues(nodeID, hookutil.OpTypeQuery, request.DbName, username).Add(float64(v))
+	metrics.ProxyRelatedCnt.WithLabelValues(nodeID, metrics.QueryLabel, request.DbName, request.CollectionName).Add(float64(qt.allQueryCnt))
+	metrics.ProxyRelatedDataSize.WithLabelValues(nodeID, metrics.QueryLabel, request.DbName, request.CollectionName).Add(float64(qt.totalRelatedDataSize))
+	metrics.ProxyResultDataSize.WithLabelValues(nodeID, metrics.QueryLabel, request.DbName, request.CollectionName).Add(float64(proto.Size(res)))
 	return res, nil
 }
 

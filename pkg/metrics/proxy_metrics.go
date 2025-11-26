@@ -309,6 +309,42 @@ var (
 			Help:      "report value about the request",
 		}, []string{nodeIDLabelName, msgTypeLabelName, databaseLabelName, usernameLabelName})
 
+	// ProxyRequestDataSize records the size of request data
+	ProxyRequestDataSize = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.ProxyRole,
+			Name:      "request_data_size",
+			Help:      "size of request data",
+		}, []string{nodeIDLabelName, msgTypeLabelName, databaseLabelName, collectionName})
+
+	// ProxyRelatedCnt records the number of delete rows related to the request
+	ProxyRelatedCnt = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.ProxyRole,
+			Name:      "related_cnt",
+			Help:      "count of rows related to the delete/search/query request",
+		}, []string{nodeIDLabelName, msgTypeLabelName, databaseLabelName, collectionName})
+
+	// ProxyResultDataSize records the size of result data
+	ProxyResultDataSize = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.ProxyRole,
+			Name:      "result_data_size",
+			Help:      "size of result data",
+		}, []string{nodeIDLabelName, msgTypeLabelName, databaseLabelName, collectionName})
+
+	// ProxyRelatedDataSize records the size of data related to the delete request
+	ProxyRelatedDataSize = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.ProxyRole,
+			Name:      "related_data_size",
+			Help:      "size of data related to the delete request",
+		}, []string{nodeIDLabelName, msgTypeLabelName, databaseLabelName, collectionName})
+
 	// ProxyLimiterRate records rates of rateLimiter in Proxy.
 	ProxyLimiterRate = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -512,6 +548,11 @@ func RegisterProxy(registry *prometheus.Registry) {
 
 	registry.MustRegister(ProxyParseExpressionLatency)
 
+	registry.MustRegister(ProxyRequestDataSize)
+	registry.MustRegister(ProxyRelatedCnt)
+	registry.MustRegister(ProxyRelatedDataSize)
+	registry.MustRegister(ProxyResultDataSize)
+
 	RegisterStreamingServiceClient(registry)
 }
 
@@ -541,6 +582,22 @@ func CleanupProxyDBMetrics(nodeID int64, dbName string) {
 		databaseLabelName: dbName,
 	})
 	ProxyFunctionCall.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+	})
+	ProxyRequestDataSize.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+	})
+	ProxyRelatedCnt.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+	})
+	ProxyRelatedDataSize.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+	})
+	ProxyResultDataSize.DeletePartialMatch(prometheus.Labels{
 		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
 		databaseLabelName: dbName,
 	})
@@ -640,5 +697,21 @@ func CleanupProxyCollectionMetrics(nodeID int64, collection string) {
 		nodeIDLabelName:    strconv.FormatInt(nodeID, 10),
 		queryTypeLabelName: SearchLabel,
 		collectionName:     collection,
+	})
+	ProxyRequestDataSize.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
+		collectionName:  collection,
+	})
+	ProxyRelatedCnt.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
+		collectionName:  collection,
+	})
+	ProxyRelatedDataSize.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
+		collectionName:  collection,
+	})
+	ProxyResultDataSize.DeletePartialMatch(prometheus.Labels{
+		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
+		collectionName:  collection,
 	})
 }

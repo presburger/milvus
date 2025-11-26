@@ -497,6 +497,14 @@ func rankSearchResultDataByGroup(ctx context.Context,
 	groupScorer func(group *Group) error,
 	groupSize int64,
 ) (*milvuspb.SearchResults, error) {
+	// Aggregate AllSearchCount across input SearchResults for hybrid rank stage.
+	// This ensures final result carries total search attempts count from all sub searches.
+	var aggregatedAllSearchCount int64
+	for _, sr := range searchResults {
+		if sr != nil && sr.GetResults() != nil {
+			aggregatedAllSearchCount += sr.GetResults().GetAllSearchCount()
+		}
+	}
 	tr := timerecord.NewTimeRecorder("rankSearchResultDataByGroup")
 	defer func() {
 		tr.CtxElapse(ctx, "done")
@@ -514,6 +522,9 @@ func rankSearchResultDataByGroup(ctx context.Context,
 	if ret = initSearchResults(nq, limit); len(searchResults) == 0 {
 		return ret, nil
 	}
+	// Fill aggregated AllSearchCount to final result.
+	// Even when input is empty, initSearchResults returns non-nil result structure.
+	ret.GetResults().AllSearchCount = aggregatedAllSearchCount
 
 	totalCount := limit * groupSize
 	if err := setupIdListForSearchResult(ret, pkType, totalCount); err != nil {
@@ -681,6 +692,14 @@ func rankSearchResultDataByPk(ctx context.Context,
 	pkType schemapb.DataType,
 	searchResults []*milvuspb.SearchResults,
 ) (*milvuspb.SearchResults, error) {
+	// Aggregate AllSearchCount across input SearchResults for hybrid rank stage.
+	// This ensures final result carries total search attempts count from all sub searches.
+	var aggregatedAllSearchCount int64
+	for _, sr := range searchResults {
+		if sr != nil && sr.GetResults() != nil {
+			aggregatedAllSearchCount += sr.GetResults().GetAllSearchCount()
+		}
+	}
 	tr := timerecord.NewTimeRecorder("rankSearchResultDataByPk")
 	defer func() {
 		tr.CtxElapse(ctx, "done")
@@ -698,6 +717,10 @@ func rankSearchResultDataByPk(ctx context.Context,
 	if ret = initSearchResults(nq, limit); len(searchResults) == 0 {
 		return ret, nil
 	}
+
+	// Fill aggregated AllSearchCount to final result.
+	// Even when input is empty, initSearchResults returns non-nil result structure.
+	ret.GetResults().AllSearchCount = aggregatedAllSearchCount
 
 	if err := setupIdListForSearchResult(ret, pkType, limit); err != nil {
 		return ret, nil
