@@ -9,7 +9,7 @@
 # is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
 # or implied. See the License for the specific language governing permissions and limitations under the License.
 
-FROM hub.byted.org/nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 as builder
+FROM hub.byted.org/nvidia/cuda:11.8.0-runtime-ubuntu22.04 as builder
 
 ARG TARGETARCH
 ARG MILVUS_ASAN_LIB
@@ -26,6 +26,17 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* 
 
 RUN apt-get update && apt-get install -y systemd
+RUN rm -rf /var/lib/apt/lists/*
+
+RUN apt-get remove -y libsqlite3-0 libxml2 
+# 清理
+RUN apt-get autoremove -y && apt-get clean
+
+RUN apt-get remove --purge -y python3 python3.10-minimal libpython3.10-minimal && \
+    apt-get autoremove -y && \
+    apt-get clean
+
+# 清理临时文件
 RUN rm -rf /var/lib/apt/lists/*
 
 # Add Tini
