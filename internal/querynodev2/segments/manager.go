@@ -27,7 +27,9 @@ import "C"
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"golang.org/x/sync/singleflight"
 
@@ -70,14 +72,17 @@ func IncreaseVersion(version int64) SegmentAction {
 }
 
 type Manager struct {
-	Collection CollectionManager
-	Segment    SegmentManager
-	DiskCache  cache.Cache[int64, Segment]
-	Loader     Loader
+	Collection     CollectionManager
+	Segment        SegmentManager
+	DiskCache      cache.Cache[int64, Segment]
+	Loader         Loader
+	diskCacheUsage atomic.Uint64
 }
 
 func NewManager() *Manager {
 	diskCap := paramtable.Get().QueryNodeCfg.DiskCacheCapacityLimit.GetAsSize()
+	// eviction interval for cache ttl
+	evictionInterval := paramtable.Get().QueryNodeCfg.DiskCacheEvictionInterval.GetAsDuration(time.Second)
 
 	segMgr := NewSegmentManager()
 	sf := singleflight.Group{}
@@ -115,6 +120,11 @@ func NewManager() *Manager {
 			}
 
 			err = manager.Loader.LoadLazySegment(ctx, segment, info)
+			if err == nil {
+				size := segment.ResourceUsageEstimate().DiskSize
+				manager.diskCacheUsage.Add(size)
+				metrics.QueryNodeDiskCacheUsageBytes.WithLabelValues(fmt.Sprint(paramtable.GetNodeID())).Set(float64(manager.diskCacheUsage.Load()))
+			}
 			return nil, err
 		})
 		if err != nil {
@@ -129,6 +139,9 @@ func NewManager() *Manager {
 		cacheEvictRecord.WithBytes(segment.ResourceUsageEstimate().DiskSize)
 		defer cacheEvictRecord.Finish(nil)
 		segment.Release(ctx, WithReleaseScope(ReleaseScopeData))
+		size := segment.ResourceUsageEstimate().DiskSize
+		manager.diskCacheUsage.Sub(size)
+		metrics.QueryNodeDiskCacheUsageBytes.WithLabelValues(fmt.Sprint(paramtable.GetNodeID())).Set(float64(manager.diskCacheUsage.Load()))
 		return nil
 	}).WithReloader(func(ctx context.Context, key int64) (Segment, error) {
 		log := log.Ctx(ctx)
@@ -151,7 +164,9 @@ func NewManager() *Manager {
 		}
 
 		return segment, nil
-	}).Build()
+	}).WithEvictionInterval(evictionInterval).Build()
+
+	metrics.QueryNodeDiskCacheCapacityBytes.WithLabelValues(fmt.Sprint(paramtable.GetNodeID())).Set(float64(diskCap))
 
 	segMgr.registerReleaseCallback(func(s Segment) {
 		if s.Type() == SegmentTypeSealed {

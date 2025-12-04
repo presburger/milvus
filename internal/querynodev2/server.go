@@ -514,6 +514,9 @@ func (node *QueryNode) Stop() error {
 		}
 		if node.manager != nil {
 			node.manager.Segment.Clear(context.Background())
+			if node.manager.DiskCache != nil {
+				node.manager.DiskCache.Close()
+			}
 		}
 
 		node.CloseSegcore()

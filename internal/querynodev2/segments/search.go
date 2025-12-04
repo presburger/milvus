@@ -89,6 +89,7 @@ func searchSegments(ctx context.Context, mgr *Manager, segments []Segment, segTy
 				}
 				if err != nil {
 					log.Warn("failed to do search for disk cache", zap.Int64("segID", seg.ID()), zap.Error(err))
+					updateLazyLoadFailMetrics(err, metrics.SearchLabel)
 				}
 				return err
 			}
@@ -179,6 +180,7 @@ func searchSegmentsStreamly(ctx context.Context,
 				}
 				if err != nil {
 					log.Warn("failed to do search for disk cache", zap.Int64("segID", seg.ID()), zap.Error(err))
+					updateLazyLoadFailMetrics(err, metrics.SearchLabel)
 				}
 				log.Debug("after doing stream search in DiskCache", zap.Int64("segID", seg.ID()), zap.Error(err))
 				return err

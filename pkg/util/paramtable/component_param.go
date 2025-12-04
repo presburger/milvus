@@ -2557,6 +2557,11 @@ type queryNodeConfig struct {
 	MaxDiskUsagePercentage ParamItem `refreshable:"true"`
 	DiskCacheCapacityLimit ParamItem `refreshable:"true"`
 
+	// disk cache ttl
+	DiskCacheTtl              ParamItem `refreshable:"true"`
+	DiskCacheSurvivalTtl      ParamItem `refreshable:"true"`
+	DiskCacheEvictionInterval ParamItem `refreshable:"true"`
+
 	// cache limit
 	CacheMemoryLimit ParamItem `refreshable:"false"`
 	MmapDirPath      ParamItem `refreshable:"false"`
@@ -3217,6 +3222,33 @@ Max read concurrency must greater than or equal to 1, and less than or equal to 
 		},
 	}
 	p.DiskCacheCapacityLimit.Init(base.mgr)
+
+	p.DiskCacheTtl = ParamItem{
+		Key:          "queryNode.diskCacheTtl",
+		Version:      "2.5.7",
+		DefaultValue: "0",
+		Export:       true,
+		Doc:          "the max time to live of disk cache, 0 means never expire",
+	}
+	p.DiskCacheTtl.Init(base.mgr)
+
+	p.DiskCacheSurvivalTtl = ParamItem{
+		Key:          "queryNode.diskCacheSurvivalTtl",
+		Version:      "2.5.7",
+		DefaultValue: "0",
+		Export:       true,
+		Doc:          "the min time to live of disk cache, 0 means never expire",
+	}
+	p.DiskCacheSurvivalTtl.Init(base.mgr)
+
+	p.DiskCacheEvictionInterval = ParamItem{
+		Key:          "queryNode.diskCacheEvictionInterval",
+		Version:      "2.5.7",
+		DefaultValue: "0",
+		Export:       true,
+		Doc:          "the interval to evict disk cache, 0 means never evict",
+	}
+	p.DiskCacheEvictionInterval.Init(base.mgr)
 
 	p.MaxTimestampLag = ParamItem{
 		Key:          "queryNode.scheduler.maxTimestampLag",

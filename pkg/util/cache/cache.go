@@ -42,6 +42,9 @@ type cacheItem[K comparable, V any] struct {
 	value      V
 	pinCount   atomic.Int32
 	needReload bool
+	// lastAccess records the last time when this item was accessed
+	// This is used for TTL-based eviction and active window protection
+	lastAccess time.Time
 }
 
 type (
@@ -157,6 +160,9 @@ type Cache[K comparable, V any] interface {
 	// Return nil if the item is removed.
 	// Return error if the Remove operation is canceled.
 	Remove(ctx context.Context, key K) error
+
+	// Close stops background processes and releases internal resources
+	Close()
 }
 
 // lruCache extends the ccache library to provide pinning and unpinning of items.
@@ -173,13 +179,20 @@ type lruCache[K comparable, V any] struct {
 	finalizer Finalizer[K, V]
 	scavenger Scavenger[K]
 	reloader  Loader[K, V]
+
+	// evictionInterval defines how often background eviction runs
+	evictionInterval time.Duration
+
+	closeCh chan struct{}
+	wg      sync.WaitGroup
 }
 
 type CacheBuilder[K comparable, V any] struct {
-	loader    Loader[K, V]
-	finalizer Finalizer[K, V]
-	scavenger Scavenger[K]
-	reloader  Loader[K, V]
+	loader           Loader[K, V]
+	finalizer        Finalizer[K, V]
+	scavenger        Scavenger[K]
+	reloader         Loader[K, V]
+	evictionInterval time.Duration
 }
 
 func NewCacheBuilder[K comparable, V any]() *CacheBuilder[K, V] {
@@ -225,8 +238,14 @@ func (b *CacheBuilder[K, V]) WithReloader(reloader Loader[K, V]) *CacheBuilder[K
 	return b
 }
 
+// WithEvictionInterval sets eviction interval for auto eviction of unaccessed items.
+func (b *CacheBuilder[K, V]) WithEvictionInterval(evictionInterval time.Duration) *CacheBuilder[K, V] {
+	b.evictionInterval = evictionInterval
+	return b
+}
+
 func (b *CacheBuilder[K, V]) Build() Cache[K, V] {
-	return newLRUCache(b.loader, b.finalizer, b.scavenger, b.reloader)
+	return newLRUCache(b.loader, b.finalizer, b.scavenger, b.reloader, b.evictionInterval)
 }
 
 func newLRUCache[K comparable, V any](
@@ -234,18 +253,38 @@ func newLRUCache[K comparable, V any](
 	finalizer Finalizer[K, V],
 	scavenger Scavenger[K],
 	reloader Loader[K, V],
+	evictionInterval time.Duration,
 ) Cache[K, V] {
-	return &lruCache[K, V]{
-		items:          make(map[K]*list.Element),
-		accessList:     list.New(),
-		waitNotifier:   syncutil.NewVersionedNotifier(),
-		loaderKeyLocks: lock.NewKeyLock[K](),
-		stats:          new(Stats),
-		loader:         loader,
-		finalizer:      finalizer,
-		scavenger:      scavenger,
-		reloader:       reloader,
+	c := &lruCache[K, V]{
+		items:            make(map[K]*list.Element),
+		accessList:       list.New(),
+		waitNotifier:     syncutil.NewVersionedNotifier(),
+		loaderKeyLocks:   lock.NewKeyLock[K](),
+		stats:            new(Stats),
+		loader:           loader,
+		finalizer:        finalizer,
+		scavenger:        scavenger,
+		reloader:         reloader,
+		evictionInterval: evictionInterval,
+		closeCh:          make(chan struct{}),
 	}
+	if evictionInterval > 0 {
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			ticker := time.NewTicker(evictionInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-c.closeCh:
+					return
+				case <-ticker.C:
+					c.evictExpired()
+				}
+			}
+		}()
+	}
+	return c
 }
 
 func (c *lruCache[K, V]) Do(ctx context.Context, key K, doer func(context.Context, V) error) (bool, error) {
@@ -318,6 +357,8 @@ func (c *lruCache[K, V]) peekAndPin(ctx context.Context, key K) *cacheItem[K, V]
 		}
 		c.accessList.MoveToFront(e)
 		item.pinCount.Inc()
+		// update last access time on pin
+		item.lastAccess = time.Now()
 		log.Debug("peeked item success",
 			zap.Int32("PinCount", item.pinCount.Load()),
 			zap.Any("key", key))
@@ -385,15 +426,29 @@ func (c *lruCache[K, V]) lockfreeTryScavenge(key K) ([]K, bool) {
 	toEvict := make([]K, 0)
 	if !ok {
 		done := false
+		activeTTL := paramtable.Get().QueryNodeCfg.DiskCacheSurvivalTtl.GetAsDuration(time.Second)
+		skippedByPin := 0
+		skippedByActiveTTL := 0
 		for p := c.accessList.Back(); p != nil && !done; p = p.Prev() {
 			evictItem := p.Value.(*cacheItem[K, V])
 			if evictItem.pinCount.Load() > 0 {
+				skippedByPin++
+				continue
+			}
+			// respect activeTTL: skip recently used items within safe window
+			if activeTTL > 0 && time.Since(evictItem.lastAccess) <= activeTTL {
+				skippedByActiveTTL++
 				continue
 			}
 			toEvict = append(toEvict, evictItem.key)
 			done = collector(evictItem.key)
 		}
 		if !done {
+			log.Warn("scavenge failed: not enough evictable space",
+				zap.Any("key", key),
+				zap.Int("skipped_by_pin", skippedByPin),
+				zap.Int("skipped_by_activeTTL", skippedByActiveTTL),
+				zap.Int("candidates_found", len(toEvict)))
 			return nil, false
 		}
 	} else {
@@ -410,6 +465,7 @@ func (c *lruCache[K, V]) setAndPin(ctx context.Context, key K, value V) (*cacheI
 
 	item := &cacheItem[K, V]{key: key, value: value}
 	item.pinCount.Inc()
+	item.lastAccess = time.Now()
 
 	// tryScavenge is done again since the load call is lock free.
 	toEvict, ok := c.lockfreeTryScavenge(key)
@@ -485,9 +541,14 @@ func (c *lruCache[K, V]) evictItems(ctx context.Context, n int) {
 	defer c.rwlock.Unlock()
 
 	toEvict := make([]K, 0)
+	activeTTL := paramtable.Get().QueryNodeCfg.DiskCacheSurvivalTtl.GetAsDuration(time.Second)
 	for p := c.accessList.Back(); p != nil && n > 0; p = p.Prev() {
 		evictItem := p.Value.(*cacheItem[K, V])
 		if evictItem.pinCount.Load() > 0 {
+			continue
+		}
+		// respect activeTTL: skip recently used items within safe window
+		if activeTTL > 0 && time.Since(evictItem.lastAccess) <= activeTTL {
 			continue
 		}
 		toEvict = append(toEvict, evictItem.key)
@@ -510,4 +571,34 @@ func (c *lruCache[K, V]) MarkItemNeedReload(ctx context.Context, key K) bool {
 	}
 
 	return false
+}
+
+// evictExpired evicts items that exceeded cacheTTL without being accessed
+func (c *lruCache[K, V]) evictExpired() {
+	cacheTTL := paramtable.Get().QueryNodeCfg.DiskCacheTtl.GetAsDuration(time.Second)
+	if cacheTTL <= 0 {
+		return
+	}
+	c.rwlock.Lock()
+	defer c.rwlock.Unlock()
+	now := time.Now()
+	toEvict := make([]K, 0)
+	for p := c.accessList.Back(); p != nil; p = p.Prev() {
+		evictItem := p.Value.(*cacheItem[K, V])
+		if evictItem.pinCount.Load() > 0 {
+			continue
+		}
+		if now.Sub(evictItem.lastAccess) >= cacheTTL {
+			toEvict = append(toEvict, evictItem.key)
+		}
+	}
+	for _, k := range toEvict {
+		c.evict(context.Background(), k)
+		c.waitNotifier.NotifyAll()
+	}
+}
+
+func (c *lruCache[K, V]) Close() {
+	close(c.closeCh)
+	c.wg.Wait()
 }

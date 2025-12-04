@@ -22,6 +22,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/cockroachdb/errors"
 	"github.com/milvus-io/milvus-proto/go-api/v2/schemapb"
 	"github.com/milvus-io/milvus/internal/querycoordv2/params"
 	"github.com/milvus-io/milvus/internal/querynodev2/segments/metricsutil"
@@ -30,10 +31,12 @@ import (
 	"github.com/milvus-io/milvus/internal/util/vecindexmgr"
 	"github.com/milvus-io/milvus/pkg/v2/common"
 	"github.com/milvus-io/milvus/pkg/v2/log"
+	"github.com/milvus-io/milvus/pkg/v2/metrics"
 	"github.com/milvus-io/milvus/pkg/v2/mq/msgstream"
 	"github.com/milvus-io/milvus/pkg/v2/proto/datapb"
 	"github.com/milvus-io/milvus/pkg/v2/proto/internalpb"
 	"github.com/milvus-io/milvus/pkg/v2/proto/querypb"
+	"github.com/milvus-io/milvus/pkg/v2/util/cache"
 	"github.com/milvus-io/milvus/pkg/v2/util/contextutil"
 	"github.com/milvus-io/milvus/pkg/v2/util/merr"
 	"github.com/milvus-io/milvus/pkg/v2/util/paramtable"
@@ -214,6 +217,27 @@ func withLazyLoadTimeoutContext(ctx context.Context) (context.Context, context.C
 	lazyLoadTimeout := paramtable.Get().QueryNodeCfg.LazyLoadWaitTimeout.GetAsDuration(time.Millisecond)
 	// TODO: use context.WithTimeoutCause instead of contextutil.WithTimeoutCause in go1.21
 	return contextutil.WithTimeoutCause(ctx, lazyLoadTimeout, errLazyLoadTimeout)
+}
+
+func updateLazyLoadFailMetrics(err error, label string) {
+	// record lazyload failure reason
+	reason := "unknown"
+	switch {
+	// diskcache is full, and can not find a evictable segment
+	case errors.Is(err, cache.ErrNotEnoughSpace):
+		reason = "cache_no_space"
+	// querynode memory or disk is full, can not load segment into memory/disk
+	case merr.ErrServiceMemoryLimitExceeded.Is(err) ||
+		merr.ErrServiceDiskLimitExceeded.Is(err):
+		reason = "resource_limit"
+	case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
+		reason = "timeout"
+	}
+	metrics.QueryNodeDiskCacheLazyLoadFailTotal.WithLabelValues(
+		fmt.Sprint(paramtable.GetNodeID()),
+		label,
+		reason,
+	).Inc()
 }
 
 func GetSegmentRelatedDataSize(segment Segment) int64 {

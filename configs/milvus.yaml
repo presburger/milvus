@@ -424,6 +424,9 @@ queryNode:
   loadMemoryUsageFactor: 1 # The multiply factor of calculating the memory usage while loading segments
   enableDisk: false # enable querynode load disk index, and search on disk index
   maxDiskUsagePercentage: 95
+  diskCacheTtl: 0 # the max time(unit: second) to live of disk cache, 0 means never expire
+  diskCacheSurvivalTtl: 0 # the min time(unit: second) to live of disk cache, 0 means never expire
+  diskCacheEvictionInterval: 0 # the interval(unit: second) to evict disk cache, 0 means never evict
   cache:
     memoryLimit: 2147483648 # 2 GB, 2 * 1024 *1024 *1024
     readAheadPolicy: willneed # The read ahead policy of chunk cache, options: `normal, random, sequential, willneed, dontneed`

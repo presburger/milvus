@@ -778,6 +778,41 @@ var (
 			nodeIDLabelName,
 		})
 
+	// QueryNodeDiskCacheLazyLoadFailTotal records the number of lazyload failures on DiskCache, categorized by reason.
+	QueryNodeDiskCacheLazyLoadFailTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.QueryNodeRole,
+			Name:      "disk_cache_lazyload_fail_total",
+			Help:      "number of lazy load failures when accessing disk cache",
+		}, []string{
+			nodeIDLabelName,
+			queryTypeLabelName, // "search" / "query"
+			"reason",           // "cache_no_space", "resource_limit", "timeout", "unknown"
+		})
+
+	// QueryNodeDiskCacheUsageBytes reports current used bytes of DiskCache per node.
+	QueryNodeDiskCacheUsageBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.QueryNodeRole,
+			Name:      "disk_cache_usage_bytes",
+			Help:      "current disk cache usage in bytes",
+		}, []string{
+			nodeIDLabelName,
+		})
+
+	// QueryNodeDiskCacheCapacityBytes reports configured capacity bytes of DiskCache per node.
+	QueryNodeDiskCacheCapacityBytes = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: milvusNamespace,
+			Subsystem: typeutil.QueryNodeRole,
+			Name:      "disk_cache_capacity_bytes",
+			Help:      "disk cache capacity in bytes",
+		}, []string{
+			nodeIDLabelName,
+		})
+
 	QueryNodeDeleteBufferSize = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: milvusNamespace,
@@ -876,6 +911,9 @@ func RegisterQueryNode(registry *prometheus.Registry) {
 	registry.MustRegister(QueryNodeDiskCacheEvictBytes)
 	registry.MustRegister(QueryNodeDiskCacheEvictDuration)
 	registry.MustRegister(QueryNodeDiskCacheEvictGlobalDuration)
+	registry.MustRegister(QueryNodeDiskCacheLazyLoadFailTotal)
+	registry.MustRegister(QueryNodeDiskCacheUsageBytes)
+	registry.MustRegister(QueryNodeDiskCacheCapacityBytes)
 	registry.MustRegister(QueryNodeSegmentPruneRatio)
 	registry.MustRegister(QueryNodeSegmentPruneLatency)
 	registry.MustRegister(QueryNodeSegmentPruneBias)
