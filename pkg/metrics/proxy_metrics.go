@@ -31,7 +31,7 @@ var (
 			Subsystem: typeutil.ProxyRole,
 			Name:      "received_nq",
 			Help:      "counter of nq of received search and query requests",
-		}, []string{nodeIDLabelName, queryTypeLabelName, collectionName})
+		}, []string{nodeIDLabelName, queryTypeLabelName, databaseLabelName, collectionName})
 
 	// ProxySearchVectors record the number of vectors search successfully.
 	ProxySearchVectors = prometheus.NewCounterVec(
@@ -87,7 +87,7 @@ var (
 			Name:      "collection_sq_latency",
 			Help:      "latency of search or query successfully, per collection",
 			Buckets:   buckets,
-		}, []string{nodeIDLabelName, queryTypeLabelName, collectionName})
+		}, []string{nodeIDLabelName, queryTypeLabelName, databaseLabelName, collectionName})
 
 	// ProxyMutationLatency record the latency that mutate successfully.
 	ProxyMutationLatency = prometheus.NewHistogramVec(
@@ -108,7 +108,7 @@ var (
 			Name:      "collection_mutation_latency",
 			Help:      "latency of insert or delete successfully, per collection",
 			Buckets:   buckets,
-		}, []string{nodeIDLabelName, msgTypeLabelName, collectionName})
+		}, []string{nodeIDLabelName, msgTypeLabelName, databaseLabelName, collectionName})
 
 	// ProxyWaitForSearchResultLatency record the time that the proxy waits for the search result.
 	ProxyWaitForSearchResultLatency = prometheus.NewHistogramVec(
@@ -603,55 +603,73 @@ func CleanupProxyDBMetrics(nodeID int64, dbName string) {
 	})
 }
 
-func CleanupProxyCollectionMetrics(nodeID int64, collection string) {
+func CleanupProxyCollectionMetrics(nodeID int64, dbName string, collection string) {
 	ProxySearchVectors.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyInsertVectors.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyUpsertVectors.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxySQLatency.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyMutationLatency.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyFunctionCall.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 
 	ProxyCollectionSQLatency.Delete(prometheus.Labels{
 		nodeIDLabelName:    strconv.FormatInt(nodeID, 10),
-		queryTypeLabelName: SearchLabel, collectionName: collection,
+		queryTypeLabelName: SearchLabel,
+		databaseLabelName:  dbName,
+		collectionName:     collection,
 	})
 	ProxyCollectionSQLatency.Delete(prometheus.Labels{
 		nodeIDLabelName:    strconv.FormatInt(nodeID, 10),
-		queryTypeLabelName: QueryLabel, collectionName: collection,
+		queryTypeLabelName: QueryLabel,
+		databaseLabelName:  dbName,
+		collectionName:     collection,
 	})
 	ProxyCollectionMutationLatency.Delete(prometheus.Labels{
-		nodeIDLabelName:  strconv.FormatInt(nodeID, 10),
-		msgTypeLabelName: InsertLabel, collectionName: collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		msgTypeLabelName:  InsertLabel,
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyCollectionMutationLatency.Delete(prometheus.Labels{
-		nodeIDLabelName:  strconv.FormatInt(nodeID, 10),
-		msgTypeLabelName: DeleteLabel, collectionName: collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		msgTypeLabelName:  DeleteLabel,
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyReceivedNQ.Delete(prometheus.Labels{
 		nodeIDLabelName:    strconv.FormatInt(nodeID, 10),
-		queryTypeLabelName: SearchLabel, collectionName: collection,
+		queryTypeLabelName: SearchLabel,
+		databaseLabelName:  dbName,
+		collectionName:     collection,
 	})
 	ProxyReceivedNQ.Delete(prometheus.Labels{
 		nodeIDLabelName:    strconv.FormatInt(nodeID, 10),
-		queryTypeLabelName: QueryLabel, collectionName: collection,
+		queryTypeLabelName: QueryLabel,
+		databaseLabelName:  dbName,
+		collectionName:     collection,
 	})
 	ProxyReceiveBytes.Delete(prometheus.Labels{
 		nodeIDLabelName:  strconv.FormatInt(nodeID, 10),
@@ -699,19 +717,23 @@ func CleanupProxyCollectionMetrics(nodeID int64, collection string) {
 		collectionName:     collection,
 	})
 	ProxyRequestDataSize.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyRelatedCnt.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyRelatedDataSize.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 	ProxyResultDataSize.DeletePartialMatch(prometheus.Labels{
-		nodeIDLabelName: strconv.FormatInt(nodeID, 10),
-		collectionName:  collection,
+		nodeIDLabelName:   strconv.FormatInt(nodeID, 10),
+		databaseLabelName: dbName,
+		collectionName:    collection,
 	})
 }
