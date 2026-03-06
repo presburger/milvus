@@ -411,13 +411,23 @@ func (node *QueryNode) Stop() error {
 			log.Warn("session fail to go stopping state", zap.Error(err))
 		} else if util.MustSelectWALName() != message.WALNameRocksmq { // rocksmq cannot support querynode graceful stop because of using local storage.
 			metrics.StoppingBalanceNodeNum.WithLabelValues().Set(1)
+			gracefulStopTimeout := paramtable.Get().QueryNodeCfg.GracefulStopTimeout.GetAsDuration(time.Second)
+			gracefulStopStart := time.Now()
+			gracefulStopDeadline := gracefulStopStart.Add(gracefulStopTimeout)
+			log.Info("start graceful stop draining loop",
+				zap.Int64("ServerID", node.GetNodeID()),
+				zap.Duration("gracefulStopTimeout", gracefulStopTimeout),
+				zap.Time("gracefulStopDeadline", gracefulStopDeadline),
+			)
 			// TODO: Redundant timeout control, graceful stop timeout is controlled by outside by `component`.
 			// Integration test is still using it, Remove it in future.
-			timeoutCh := time.After(paramtable.Get().QueryNodeCfg.GracefulStopTimeout.GetAsDuration(time.Second))
+			timeoutCh := time.After(gracefulStopTimeout)
+			iteration := 0
 
 		outer:
 			for (node.manager != nil && !node.manager.Segment.Empty()) ||
 				(node.pipelineManager != nil && node.pipelineManager.Num() != 0) {
+				iteration++
 				var (
 					sealedSegments  = []segments.Segment{}
 					growingSegments = []segments.Segment{}
@@ -430,13 +440,39 @@ func (node *QueryNode) Stop() error {
 				if node.pipelineManager != nil {
 					channelNum = node.pipelineManager.Num()
 				}
+
+				elapsed := time.Since(gracefulStopStart)
+				log.Info("graceful stop loop check",
+					zap.Int64("ServerID", node.GetNodeID()),
+					zap.Int("iteration", iteration),
+					zap.Duration("elapsed", elapsed),
+					zap.Duration("gracefulStopTimeout", gracefulStopTimeout),
+					zap.Int("sealedSegmentNum", len(sealedSegments)),
+					zap.Int("growingSegmentNum", len(growingSegments)),
+					zap.Int("channelNum", channelNum),
+					zap.Int64s("sealedSegments", lo.Map(sealedSegments, func(s segments.Segment, i int) int64 {
+						return s.ID()
+					})),
+					zap.Int64s("growingSegments", lo.Map(growingSegments, func(t segments.Segment, i int) int64 {
+						return t.ID()
+					})),
+				)
+
 				if len(sealedSegments) == 0 && len(growingSegments) == 0 && channelNum == 0 {
+					log.Info("graceful stop loop break: all data drained",
+						zap.Int64("ServerID", node.GetNodeID()),
+						zap.Int("iteration", iteration),
+						zap.Duration("elapsed", elapsed),
+					)
 					break outer
 				}
 
 				select {
 				case <-timeoutCh:
-					log.Warn("migrate data timed out", zap.Int64("ServerID", node.GetNodeID()),
+					log.Warn("graceful stop loop break: migrate data timed out", zap.Int64("ServerID", node.GetNodeID()),
+						zap.Int("iteration", iteration),
+						zap.Duration("elapsed", elapsed),
+						zap.Duration("gracefulStopTimeout", gracefulStopTimeout),
 						zap.Int64s("sealedSegments", lo.Map(sealedSegments, func(s segments.Segment, i int) int64 {
 							return s.ID()
 						})),
@@ -449,7 +485,11 @@ func (node *QueryNode) Stop() error {
 				case <-time.After(time.Second):
 					metrics.StoppingBalanceSegmentNum.WithLabelValues(fmt.Sprint(node.GetNodeID())).Set(float64(len(sealedSegments)))
 					metrics.StoppingBalanceChannelNum.WithLabelValues(fmt.Sprint(node.GetNodeID())).Set(float64(channelNum))
-					log.Info("migrate data...", zap.Int64("ServerID", node.GetNodeID()),
+					log.Info("migrate data, continue waiting next round", zap.Int64("ServerID", node.GetNodeID()),
+						zap.Int("iteration", iteration),
+						zap.Duration("elapsed", elapsed),
+						zap.Duration("gracefulStopTimeout", gracefulStopTimeout),
+						zap.Duration("nextCheckAfter", time.Second),
 						zap.Int64s("sealedSegments", lo.Map(sealedSegments, func(s segments.Segment, i int) int64 {
 							return s.ID()
 						})),
